@@ -1226,6 +1226,21 @@ app.get("/api/admin/export-system-keys", (req, res) => {
     });
 });
 
+// Global API 404 handler (ensures API always returns valid JSON, never HTML)
+app.use("/api", (req, res) => {
+    res.status(404).json({
+        error: `Endpoint not found: ${req.method} ${req.originalUrl}`
+    });
+});
+
+// Global error handling middleware (ensures all server errors return valid JSON)
+app.use((err, req, res, next) => {
+    console.error("Unhandled Server Error:", err);
+    res.status(err.status || 500).json({
+        error: err.message || "Internal server error occurred."
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`\n=================================================`);
     console.log(`🚀 cyberNova Security Hub: http://localhost:${PORT}`);
