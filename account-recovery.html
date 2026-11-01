@@ -183,6 +183,18 @@
     </div>
 
     <script type="module">
+    async function safeJson(res) {
+        const text = await res.text();
+        try {
+            return JSON.parse(text);
+        } catch {
+            if (!res.ok) {
+                throw new Error(`Backend service is offline or unreachable (HTTP ${res.status}). Ensure the Render backend is running.`);
+            }
+            throw new Error(text.length > 120 ? "Invalid server response." : text);
+        }
+    }
+
         import { startRegistration } from "https://esm.sh/@simplewebauthn/browser@14.0.0";
 
         const statusBox = document.getElementById("statusMessage");
@@ -201,7 +213,7 @@
             const email = document.getElementById("recoveryEmail").value.trim().toLowerCase();
             try {
                 const res = await fetch(`/api/recovery/demo-code?email=${encodeURIComponent(email)}`);
-                const data = await res.json();
+                const data = await safeJson(res);
                 if (data.code) {
                     document.getElementById("recoveryCode").value = data.code;
                     showStatus(`ℹ️ Loaded active demo recovery key: <code>${data.code}</code>. Click <strong>Verify Recovery Code</strong>.`, "info");
@@ -229,7 +241,7 @@
                     body: JSON.stringify({ email, recoveryCode })
                 });
 
-                const data = await res.json();
+                const data = await safeJson(res);
                 if (!res.ok) throw new Error(data.error || "Recovery code verification failed.");
 
                 showStatus("✅ <strong>Identity Verified!</strong> Recovery code accepted. Please review your credentials below.", "success");
@@ -245,7 +257,7 @@
         async function loadUserCredentials() {
             try {
                 const res = await fetch("/api/credentials");
-                const data = await res.json();
+                const data = await safeJson(res);
                 if (!res.ok) throw new Error("Could not load credentials.");
 
                 if (data.credentials.length === 0) {
@@ -279,7 +291,7 @@
             if (!confirm("Are you sure you want to revoke this passkey? It will immediately lose authentication access.")) return;
             try {
                 const res = await fetch(`/api/credentials/${id}/revoke`, { method: "POST" });
-                const data = await res.json();
+                const data = await safeJson(res);
                 if (!res.ok) throw new Error(data.error || "Failed to revoke.");
                 showStatus("✅ Credential revoked successfully.", "success");
                 loadUserCredentials();
@@ -298,7 +310,7 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email })
                 });
-                const options = await res.json();
+                const options = await safeJson(res);
                 if (!res.ok) throw new Error(options.error || "Failed to initialize registration.");
 
                 showStatus("<i class='fa-solid fa-fingerprint'></i> Touch biometric sensor to register replacement passkey...", "info");
@@ -311,7 +323,7 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email, response: credential, deviceName })
                 });
-                const result = await verifyRes.json();
+                const result = await safeJson(verifyRes);
                 if (!verifyRes.ok) throw new Error(result.error || "Registration failed.");
 
                 showStatus("✅ <strong>Replacement Passkey Enrolled!</strong> You can now sign in with this new passkey.", "success");

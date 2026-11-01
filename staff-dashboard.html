@@ -297,7 +297,7 @@
             // Verify session
             const meRes = await fetch("/api/me");
             if (!meRes.ok) { window.location.href = "staff-login.html"; return; }
-            const meData = await meRes.json();
+            const meData = await safeJson(meRes);
 
             const name = meData.user.displayName || meData.user.email;
             document.getElementById("userDisplayName").innerHTML =
@@ -306,7 +306,7 @@
 
             // Load SOC Telemetry
             const res = await fetch("/api/admin/soc-telemetry");
-            const data = await res.json();
+            const data = await safeJson(res);
 
             // Update Metrics
             document.getElementById("statActivePasskeys").textContent = data.stats.activePasskeys ?? data.stats.totalPasskeys;

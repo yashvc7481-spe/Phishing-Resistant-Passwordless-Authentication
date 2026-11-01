@@ -195,6 +195,18 @@ export class CyberNovaAuth {
         return (this.emailInput?.value || "").trim().toLowerCase();
     }
 
+    async parseJson(res) {
+        const text = await res.text();
+        try {
+            return JSON.parse(text);
+        } catch {
+            if (!res.ok) {
+                throw new Error(`Backend service is offline or unreachable (HTTP ${res.status}). Please ensure the Render backend is deployed and running.`);
+            }
+            throw new Error(text.length > 120 ? "Invalid server response." : text);
+        }
+    }
+
     setupEventListeners() {
         // Tab switching
         this.tabBiometric?.addEventListener("click", () => this.switchTab("biometric"));
@@ -313,7 +325,7 @@ export class CyberNovaAuth {
                 body: JSON.stringify({ email })
             });
 
-            const options = await res.json();
+            const options = await this.parseJson(res);
             if (!res.ok) {
                 if (options.error && options.error.includes("No passkeys registered")) {
                     this.showStatus(`⚠️ <strong>No passkey enrolled for this account yet.</strong><br>Click <em>"Enroll Fingerprint on This Device"</em> below to enroll your biometric token.`, "warning");
@@ -336,7 +348,7 @@ export class CyberNovaAuth {
                 body: JSON.stringify({ email, response: credential })
             });
 
-            const result = await verifyRes.json();
+            const result = await this.parseJson(verifyRes);
             if (!verifyRes.ok) throw new Error(result.error || "Biometric authentication rejected by server.");
 
             this.showStatus("✅ <strong>Fingerprint Authenticated!</strong> Secure cryptographic session established. Redirecting...", "success");
@@ -378,7 +390,7 @@ export class CyberNovaAuth {
                 })
             });
 
-            const options = await res.json();
+            const options = await this.parseJson(res);
             if (!res.ok) throw new Error(options.error || "Could not generate enrollment challenge.");
 
             this.showStatus("<i class='fa-solid fa-fingerprint'></i> Place finger on sensor to register biometric passkey...", "info");
@@ -398,7 +410,7 @@ export class CyberNovaAuth {
                 body: JSON.stringify({ email, response: credential, deviceName })
             });
 
-            const result = await verifyRes.json();
+            const result = await this.parseJson(verifyRes);
             if (!verifyRes.ok) throw new Error(result.error || "Biometric enrollment rejected.");
 
             this.showStatus("✅ <strong>Biometric Enrolled Successfully!</strong> Your fingerprint is cryptographically registered. Click <strong>'Sign In with Fingerprint'</strong> to enter.", "success");
@@ -430,7 +442,7 @@ export class CyberNovaAuth {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: email || "" })
             });
-            const data = await res.json();
+            const data = await this.parseJson(res);
             const qrUrl = data.qrCodeDataUrl || data.qrDataUrl;
             const mobileUrl = data.mobileAuthUrl || data.mobileUrl;
             if (data.success && qrUrl) {
@@ -460,7 +472,7 @@ export class CyberNovaAuth {
         this.qrPollTimer = setInterval(async () => {
             try {
                 const res = await fetch(`/api/auth/hybrid-qr/status?sessionId=${encodeURIComponent(sessionId)}`);
-                const data = await res.json();
+                const data = await this.parseJson(res);
                 if (data.success && data.status === "approved") {
                     clearInterval(this.qrPollTimer);
                     this.qrPollTimer = null;
@@ -505,7 +517,7 @@ export class CyberNovaAuth {
                     deviceName: "Paired Mobile Device (Camera Scan & Proximity)"
                 })
             });
-            const data = await res.json();
+            const data = await this.parseJson(res);
             if (data.success) {
                 if (this.qrStatusText) this.qrStatusText.textContent = "✅ Instant Approval Confirmed!";
                 this.showStatus(
@@ -627,7 +639,7 @@ export class CyberNovaAuth {
                 })
             });
 
-            const challengeData = await challengeRes.json();
+            const challengeData = await this.parseJson(challengeRes);
             if (!challengeRes.ok) throw new Error(challengeData.error || "Failed to generate Bluetooth challenge.");
 
             this.currentBluetoothSession = challengeData;
@@ -706,7 +718,7 @@ export class CyberNovaAuth {
                 })
             });
 
-            const result = await res.json();
+            const result = await this.parseJson(res);
             if (!res.ok) {
                 if (res.status === 403) {
                     throw new Error(result.error || "Access Denied: This Bluetooth device has been revoked or failed security checks.");
@@ -775,7 +787,7 @@ export class CyberNovaAuth {
                 body: JSON.stringify({ email, code })
             });
 
-            const result = await res.json();
+            const result = await this.parseJson(res);
             if (!res.ok) throw new Error(result.error || "Emergency code verification failed.");
 
             this.showStatus("✅ <strong>High Assurance Verification Confirmed!</strong> Redirecting to secure portal...", "success");
@@ -801,7 +813,7 @@ export class CyberNovaAuth {
 
         try {
             const res = await fetch(`/api/auth/fallback/hint?email=${encodeURIComponent(email)}`);
-            const data = await res.json();
+            const data = await this.parseJson(res);
             if (data.code && this.fallbackCodeInput) {
                 this.fallbackCodeInput.value = data.code;
                 this.showStatus(`ℹ️ Loaded enrolled emergency backup code: <code>${data.code}</code>. Click <strong>Verify Emergency Code</strong> to sign in.`, "info");

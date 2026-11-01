@@ -1,3 +1,15 @@
+async function safeJson(res) {
+    const text = await res.text();
+    try {
+        return JSON.parse(text);
+    } catch {
+        if (!res.ok) {
+            throw new Error(`Backend service is offline or unreachable (HTTP ${res.status}). Ensure the Render backend is running.`);
+        }
+        throw new Error(text.length > 120 ? "Invalid server response." : text);
+    }
+}
+
 import { startAuthentication } from "https://esm.sh/@simplewebauthn/browser@14.0.0";
 
 const loginBtn = document.getElementById("passkeyLogin");
@@ -31,7 +43,7 @@ if (loginBtn) {
                 body: JSON.stringify({ email })
             });
 
-            const options = await res.json();
+            const options = await safeJson(res);
             if (!res.ok) throw new Error(options.error || "Failed to start passkey login.");
 
             showStatus("<i class='fa-solid fa-fingerprint'></i> Scan Fingerprint / Face ID or authenticate via Phone Bluetooth...", "info");
@@ -51,7 +63,7 @@ if (loginBtn) {
                 })
             });
 
-            const result = await verifyRes.json();
+            const result = await safeJson(verifyRes);
             if (!verifyRes.ok) throw new Error(result.error || "Authentication failed.");
 
             showStatus("✅ <strong>Identity Verified!</strong> Redirecting to secure portal...", "success");

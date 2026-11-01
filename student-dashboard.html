@@ -336,6 +336,18 @@
 
     let currentUserEmail = "";
 
+    async function safeJson(res) {
+        const text = await res.text();
+        try {
+            return JSON.parse(text);
+        } catch {
+            if (!res.ok) {
+                throw new Error(`Backend service is offline or unreachable (HTTP ${res.status}). Ensure the Render backend is running.`);
+            }
+            throw new Error(text.length > 120 ? "Invalid server response." : text);
+        }
+    }
+
     async function loadDashboard() {
         try {
             const res = await fetch("/api/me");
@@ -343,7 +355,7 @@
                 window.location.href = "student-login.html";
                 return;
             }
-            const data = await res.json();
+            const data = await safeJson(res);
             currentUserEmail = data.user.email;
 
             const name = data.user.displayName || data.user.email;
@@ -447,7 +459,7 @@
         const tbody = document.getElementById("userActivityBody");
         try {
             const res = await fetch("/api/user/audit-logs");
-            const data = await res.json();
+            const data = await safeJson(res);
             if (!data.logs || data.logs.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">No security events recorded for this account yet.</td></tr>`;
                 return;
@@ -488,7 +500,7 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ deviceName: newName.trim() })
             });
-            const data = await res.json();
+            const data = await safeJson(res);
             if (!res.ok) throw new Error(data.error || "Failed to rename.");
             loadDashboard();
         } catch (err) {
@@ -501,7 +513,7 @@
 
         try {
             const res = await fetch(`/api/credentials/${credId}/revoke`, { method: "POST" });
-            const data = await res.json();
+            const data = await safeJson(res);
             if (!res.ok) throw new Error(data.error || "Failed to revoke passkey.");
             loadDashboard();
         } catch (err) {
@@ -518,7 +530,7 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: currentUserEmail })
             });
-            const options = await res.json();
+            const options = await safeJson(res);
             if (!res.ok) throw new Error(options.error || "Failed to initialize registration.");
 
             const credential = await startRegistration({ optionsJSON: options });
@@ -529,7 +541,7 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: currentUserEmail, response: credential, deviceName })
             });
-            const result = await verifyRes.json();
+            const result = await safeJson(verifyRes);
             if (!verifyRes.ok) throw new Error(result.error || "Registration failed.");
 
             alert("✅ New passkey device enrolled successfully!");
@@ -549,7 +561,7 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ deviceName: newName.trim() })
             });
-            const data = await res.json();
+            const data = await safeJson(res);
             if (!res.ok) throw new Error(data.error || "Failed to rename.");
             loadDashboard();
         } catch (err) {
@@ -562,7 +574,7 @@
 
         try {
             const res = await fetch(`/api/bluetooth/devices/${devId}/revoke`, { method: "POST" });
-            const data = await res.json();
+            const data = await safeJson(res);
             if (!res.ok) throw new Error(data.error || "Failed to revoke Bluetooth device.");
             loadDashboard();
         } catch (err) {
@@ -610,7 +622,7 @@
                 })
             });
 
-            const data = await res.json();
+            const data = await safeJson(res);
             if (!res.ok) throw new Error(data.error || "Failed to pair device.");
 
             alert("✅ " + data.message);
@@ -636,7 +648,7 @@
                     deviceIdentifier: "BLE-VIRTUAL-" + Math.floor(1000 + Math.random() * 9000)
                 })
             });
-            const data = await res.json();
+            const data = await safeJson(res);
             if (!res.ok) throw new Error(data.error || "Failed to pair demo device.");
 
             alert("✅ " + data.message);
@@ -652,7 +664,7 @@
         if (!confirm("Generating new recovery codes will invalidate any existing recovery codes. Continue?")) return;
         try {
             const res = await fetch("/api/recovery/generate", { method: "POST" });
-            const data = await res.json();
+            const data = await safeJson(res);
             if (!res.ok) throw new Error(data.error || "Failed to generate codes.");
 
             const box = document.getElementById("newRecoveryCodesBox");

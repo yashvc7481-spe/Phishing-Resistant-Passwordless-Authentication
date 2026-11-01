@@ -285,6 +285,18 @@
 <div id="toast-container"></div>
 
 <script>
+    async function safeJson(res) {
+        const text = await res.text();
+        try {
+            return JSON.parse(text);
+        } catch {
+            if (!res.ok) {
+                throw new Error(`Backend service is offline or unreachable (HTTP ${res.status}). Ensure the Render backend is running.`);
+            }
+            throw new Error(text.length > 120 ? "Invalid server response." : text);
+        }
+    }
+
     function simulatePasswordTheft() {
         const pwd = document.getElementById("simPassword").value;
         document.getElementById("capturedPwd").textContent = pwd;
@@ -313,7 +325,7 @@
     async function triggerHoneypot() {
         try {
             const res = await fetch("/api/admin/export-system-keys");
-            const data = await res.json();
+            const data = await safeJson(res);
             const box = document.getElementById("honeyResult");
             box.classList.remove("hidden");
             box.innerHTML = `<span class="term-red">[HONEYTOKEN TRIPPED]</span> Server responded with HTTP 403 Forbidden<br><strong>Status:</strong> ${data.error}<br><em style="color: var(--text-muted);">Intrusion event logged as CRITICAL in Staff SOC Dashboard.</em>`;

@@ -165,6 +165,18 @@
     </div>
 
     <script>
+    async function safeJson(res) {
+        const text = await res.text();
+        try {
+            return JSON.parse(text);
+        } catch {
+            if (!res.ok) {
+                throw new Error(`Backend service is offline or unreachable (HTTP ${res.status}). Ensure the Render backend is running.`);
+            }
+            throw new Error(text.length > 120 ? "Invalid server response." : text);
+        }
+    }
+
         const params = new URLSearchParams(window.location.search);
         const sessionId = params.get("session") || "";
         const email = params.get("email") || "student@nkocet.edu";
@@ -204,7 +216,7 @@
                     })
                 });
 
-                const data = await res.json();
+                const data = await safeJson(res);
                 if (!res.ok) throw new Error(data.error || "Approval failed.");
 
                 phoneIcon.style.borderColor = "#10B981";
