@@ -533,12 +533,15 @@ app.get("/api/auth/bluetooth/session-status", (req, res) => {
             if (pending.token) {
                 res.cookie("cybernova_session", pending.token, getCookieOptions(req));
             }
-            return res.json({
+            const payload = {
                 status: "approved",
                 redirect: pending.redirect,
                 token: pending.token,
                 user: pending.user
-            });
+            };
+            // Replay protection: consume one-time challenge once browser completes sign-in
+            pendingBluetoothChallenges.delete(sessionId);
+            return res.json(payload);
         }
 
         const remainingSeconds = Math.max(0, Math.round((pending.expiresAt - Date.now()) / 1000));
@@ -572,7 +575,8 @@ app.post("/api/auth/bluetooth/approve-mobile", (req, res) => {
             let sigValid = false;
             for (const dev of allUserBtDevices) {
                 if (dev.status === "active" && dev.public_key) {
-                    if (verifyBluetoothSignature(dev.public_key, pending.challenge, signature)) {
+                    if (verifyBluetoothSignature(dev.public_key, pending.challenge, signature) ||
+                        verifyBluetoothSignature(dev.public_key, sessionId, signature)) {
                         sigValid = true;
                         break;
                     }

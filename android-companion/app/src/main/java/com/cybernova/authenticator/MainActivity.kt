@@ -99,19 +99,21 @@ class MainActivity : AppCompatActivity() {
      */
     private fun checkBiometricAvailability() {
         val biometricManager = BiometricManager.from(this)
-        when (biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)) {
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK
+        when (biometricManager.canAuthenticate(authenticators)) {
             BiometricManager.BIOMETRIC_SUCCESS -> {
                 tvStatus.text = "Hardware Fingerprint Sensor Ready."
             }
             BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> {
-                tvStatus.text = "Error: No biometric hardware on this Android device."
+                tvStatus.text = "Error: No biometric hardware detected on this Android device."
                 btnScanFingerprint.isEnabled = false
             }
             BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> {
-                tvStatus.text = "Error: Biometric hardware is currently unavailable."
+                tvStatus.text = "Error: Biometric hardware is currently busy or unavailable."
             }
             BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
-                tvStatus.text = "Error: No fingerprint enrolled in Android Settings."
+                tvStatus.text = "Error: No fingerprint enrolled. Please enroll a fingerprint in Android Settings."
+                btnScanFingerprint.isEnabled = false
             }
             else -> {
                 tvStatus.text = "Biometric security status: Ready."
@@ -128,15 +130,33 @@ class MainActivity : AppCompatActivity() {
             .setSubtitle("Confirm sign-in to CyberNova Web Portal")
             .setDescription("Touch the fingerprint sensor to authenticate $currentEmail")
             .setNegativeButtonText("Cancel")
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK)
             .build()
 
         biometricPrompt = BiometricPrompt(this, executor,
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
-                    tvStatus.text = "Biometric Error: $errString"
-                    Toast.makeText(applicationContext, "Authentication Error: $errString", Toast.LENGTH_SHORT).show()
+                    when (errorCode) {
+                        BiometricPrompt.ERROR_USER_CANCELED,
+                        BiometricPrompt.ERROR_NEGATIVE_BUTTON -> {
+                            tvStatus.text = "Biometric verification cancelled by user."
+                        }
+                        BiometricPrompt.ERROR_LOCKOUT,
+                        BiometricPrompt.ERROR_LOCKOUT_PERMANENT -> {
+                            tvStatus.text = "Biometric sensor locked due to too many attempts."
+                        }
+                        BiometricPrompt.ERROR_NO_BIOMETRICS -> {
+                            tvStatus.text = "No fingerprint enrolled. Please set up a fingerprint in Android Settings."
+                        }
+                        BiometricPrompt.ERROR_HW_UNAVAILABLE -> {
+                            tvStatus.text = "Fingerprint sensor currently unavailable. Try again shortly."
+                        }
+                        else -> {
+                            tvStatus.text = "Biometric Error: $errString"
+                        }
+                    }
+                    Toast.makeText(applicationContext, "Biometric: $errString", Toast.LENGTH_SHORT).show()
                 }
 
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -148,7 +168,7 @@ class MainActivity : AppCompatActivity() {
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
-                    tvStatus.text = "Fingerprint not recognized. Please try again."
+                    tvStatus.text = "Fingerprint not recognized. Touch the sensor again with an enrolled finger."
                 }
             })
     }
