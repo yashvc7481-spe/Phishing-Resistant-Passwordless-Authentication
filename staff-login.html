@@ -149,105 +149,115 @@
                 </div>
             </div>
 
-            <!-- PANEL 2: Bluetooth Proximity Authentication (FIDO2 Hybrid caBLE / QR Code) -->
+            <!-- PANEL 2: Bluetooth Proximity Authentication -->
             <div id="panelBluetooth" class="auth-panel hidden">
-                
-                <!-- QR Code Proximity Authenticator -->
-                <div class="bt-qr-auth-container" id="btQrAuthBox">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                        <span style="font-weight: 700; font-size: 13px; color: #A78BFA;">
-                            <i class="fa-solid fa-qrcode"></i> Administrative Bluetooth QR Proximity Link
-                        </span>
-                        <span class="badge badge-purple" style="font-size: 10px;">FIDO2 caBLE</span>
+                <div class="bluetooth-radar-box" id="btRadarBox">
+                    <div class="bluetooth-radar-rings">
+                        <div class="bt-radar-ring bt-ring-1"></div>
+                        <div class="bt-radar-ring bt-ring-2"></div>
+                        <i class="fa-brands fa-bluetooth-b bluetooth-icon-glyph"></i>
                     </div>
+                    <div class="biometric-state-text" id="btRadarTitle">Administrative Bluetooth Proximity</div>
+                    <div class="biometric-state-subtext" id="btRadarSubtitle">BLE GATT Proximity &middot; Cryptographic Challenge</div>
+                </div>
 
-                    <div class="qr-code-frame" id="qrCodeFrame">
-                        <div id="qrCodeSpinner" style="text-align: center; color: var(--text-muted); padding: 30px 10px;">
-                            <i class="fa-solid fa-spinner fa-spin" style="font-size: 32px; color: #A78BFA; margin-bottom: 10px;"></i>
-                            <div style="font-size: 12px;">Generating Ephemeral Nonce QR Code...</div>
-                        </div>
-                        <img id="btQrImage" src="" alt="Bluetooth Pairing QR Code" class="hidden" style="width: 200px; height: 200px; border-radius: 8px; margin: 0 auto; background: white; padding: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);">
+                <!-- Bluetooth Scanner Status Bar -->
+                <div class="bt-scanner-status-bar" id="btScannerStatusBar">
+                    <div class="bt-status-pill">
+                        <span class="bt-pulse-indicator" id="btPulseIndicator"></span>
+                        <span id="btStatusLabel">Scanner Ready · Discoverable BLE Mode</span>
                     </div>
+                    <span class="badge badge-purple" style="font-size: 10px;" id="btRangeLabel">2.4 GHz Band</span>
+                </div>
 
-                    <div class="bt-status-pill" style="justify-content: center; margin: 10px 0 6px;">
-                        <span class="bt-pulse-indicator connected" id="qrPulseIndicator"></span>
-                        <span id="qrStatusText" style="font-size: 11px; font-weight: 600; color: #F8FAFC;">Awaiting Phone Camera Scan...</span>
+                <!-- Bluetooth Availability Indicator -->
+                <div id="btAvailabilityRow" style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 7px 10px; background: rgba(255,255,255,0.04); border-radius: 8px; border: 1px solid rgba(255,255,255,0.07);">
+                    <span id="btAvailabilityBadge" class="badge badge-blue" style="font-size: 10px; padding: 3px 9px;">
+                        <i class="fa-brands fa-bluetooth-b"></i> Checking…
+                    </span>
+                    <span id="btAvailabilityText" style="font-size: 11px; color: var(--text-muted);">Detecting Bluetooth adapter…</span>
+                </div>
+
+                <!-- Scanner Step Progress -->
+                <div id="btStepStrip" style="display: flex; gap: 4px; margin-bottom: 12px; align-items: center;">
+                    <div id="btStep1" class="bt-step" title="Step 1: Scan">
+                        <span class="bt-step-num">1</span><span class="bt-step-label">Scan</span>
                     </div>
-
-                    <p style="font-size: 11px; color: var(--text-muted); text-align: center; margin: 0 0 14px; line-height: 1.4;">
-                        Scan with your smartphone camera to establish a secure Bluetooth proximity channel and authorize admin access.
-                    </p>
-
-                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                        <button type="button" id="btnInstantApprove" class="passkey-btn staff-btn" style="flex: 2; margin: 0; font-size: 13px;">
-                            <i class="fa-solid fa-bolt"></i> Instant Biometric Approve
-                        </button>
-                        <button type="button" id="btnOpenMobileTab" class="btn btn-secondary" title="Open mobile view in new tab" style="flex: 1; padding: 10px; font-size: 12px;">
-                            <i class="fa-solid fa-mobile-screen"></i> Phone View
-                        </button>
+                    <div class="bt-step-divider"></div>
+                    <div id="btStep2" class="bt-step" title="Step 2: Select Device">
+                        <span class="bt-step-num">2</span><span class="bt-step-label">Select</span>
                     </div>
-
-                    <div style="text-align: center; margin-top: 6px;">
-                        <button type="button" id="btnToggleBleRawScan" style="background: none; border: none; color: var(--text-muted); font-size: 11px; cursor: pointer; text-decoration: underline;">
-                            <i class="fa-brands fa-bluetooth-b"></i> Have a physical BLE hardware token? Toggle Browser Dialog &rarr;
-                        </button>
+                    <div class="bt-step-divider"></div>
+                    <div id="btStep3" class="bt-step" title="Step 3: Connect">
+                        <span class="bt-step-num">3</span><span class="bt-step-label">Connect</span>
+                    </div>
+                    <div class="bt-step-divider"></div>
+                    <div id="btStep4" class="bt-step" title="Step 4: Verify">
+                        <span class="bt-step-num">4</span><span class="bt-step-label">Verify</span>
                     </div>
                 </div>
 
-                <!-- Raw BLE Scanner Section (collapsible) -->
-                <div id="btRawScannerSection" class="hidden">
-                    <div class="bluetooth-radar-box" id="btRadarBox">
-                        <div class="bluetooth-radar-rings">
-                            <div class="bt-radar-ring bt-ring-1"></div>
-                            <div class="bt-radar-ring bt-ring-2"></div>
-                            <i class="fa-brands fa-bluetooth-b bluetooth-icon-glyph"></i>
+                <!-- Discovered Device Card (shown after requestDevice resolves, before GATT connect) -->
+                <div id="btDiscoveredCard" class="bt-connected-card hidden" style="border-color: rgba(167,139,250,0.3); margin-bottom: 10px;">
+                    <div class="bt-connected-header">
+                        <div class="bt-device-name" id="btDiscoveredDeviceName">
+                            <i class="fa-brands fa-bluetooth-b" style="color: #A78BFA;"></i> Discovered Device
                         </div>
-                        <div class="biometric-state-text" id="btRadarTitle">Administrative Bluetooth Proximity</div>
-                        <div class="biometric-state-subtext" id="btRadarSubtitle">BLE GATT Proximity &middot; Cryptographic Challenge</div>
-                    </div>
-
-                    <div class="bt-scanner-status-bar" id="btScannerStatusBar">
-                        <div class="bt-status-pill">
-                            <span class="bt-pulse-indicator" id="btPulseIndicator"></span>
-                            <span id="btStatusLabel">Scanner Ready · Discoverable BLE Mode</span>
+                        <div class="bt-status-live" style="color: #F59E0B;">
+                            <span class="pulse-dot" style="background:#F59E0B;"></span> Pending Connection
                         </div>
-                        <span class="badge badge-purple" style="font-size: 10px;" id="btRangeLabel">2.4 GHz Band</span>
                     </div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">
+                        Device ID: <code id="btDiscoveredDeviceId">—</code>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">
+                        Services: <span id="btDiscoveredServices">Discovering…</span>
+                    </div>
+                    <button type="button" id="btnBluetoothAuthenticate" class="passkey-btn staff-btn" style="width: 100%; margin: 0; font-size: 13px;">
+                        <i class="fa-solid fa-plug-circle-bolt"></i> Connect &amp; Authenticate
+                    </button>
+                </div>
 
-                    <div style="display: flex; gap: 8px; margin-bottom: 8px;" id="btActionButtonsRow">
-                        <button type="button" id="btConnectBtn" class="passkey-btn staff-btn" style="flex: 2; margin: 0;">
-                            <i class="fa-brands fa-bluetooth-b"></i>
-                            Scan Nearby BLE Devices
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;" id="btActionButtonsRow">
+                    <button type="button" id="btConnectBtn" class="passkey-btn staff-btn" style="flex: 2; margin: 0;">
+                        <i class="fa-brands fa-bluetooth-b"></i>
+                        SCAN BLUETOOTH DEVICE
+                    </button>
+                    <button type="button" id="btDemoBtn" class="btn btn-secondary" title="Use virtual hardware token for quick testing" style="flex: 1; padding: 10px; font-size: 12px;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Demo Token
+                    </button>
+                </div>
+
+                <!-- Retry Scan Button (shown after failure states) -->
+                <div id="btRetryRow" class="hidden" style="margin-bottom: 8px;">
+                    <button type="button" id="btnBluetoothRetry" class="btn btn-secondary" style="width: 100%; padding: 10px; font-size: 12px;">
+                        <i class="fa-solid fa-rotate-right"></i> Retry Scan
+                    </button>
+                </div>
+
+                <!-- Connected Device & Challenge Card -->
+                <div id="btConnectedCard" class="bt-connected-card hidden">
+                    <div class="bt-connected-header">
+                        <div class="bt-device-name" id="btDeviceName">
+                            <i class="fa-brands fa-bluetooth-b" style="color: #A78BFA;"></i> Paired BLE Device
+                        </div>
+                        <div class="bt-status-live">
+                            <span class="pulse-dot"></span> Active GATT Link
+                        </div>
+                    </div>
+                    <div class="bt-device-meta" id="btDeviceMeta" style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
+                        Device Identifier: <code id="btDeviceIdPreview">—</code>
+                    </div>
+                    <div class="bt-challenge-preview" id="btChallengeDisplay">
+                        Awaiting server challenge...
+                    </div>
+                    <div style="display: flex; gap: 8px; margin-top: 12px;">
+                        <button type="button" id="btVerifyBtn" class="passkey-btn staff-btn" style="flex: 1; margin: 0; font-size: 13px;">
+                            <i class="fa-solid fa-circle-check"></i> Verify Proximity &amp; Sign In
                         </button>
-                        <button type="button" id="btDemoBtn" class="btn btn-secondary" title="Use virtual hardware token for quick testing" style="flex: 1; padding: 10px; font-size: 12px;">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Demo Token
+                        <button type="button" id="btDisconnectBtn" class="btn btn-secondary" style="padding: 10px 14px;" title="Disconnect Bluetooth Authenticator">
+                            <i class="fa-solid fa-link-slash"></i>
                         </button>
-                    </div>
-
-                    <!-- Connected Device & Challenge Card -->
-                    <div id="btConnectedCard" class="bt-connected-card hidden">
-                        <div class="bt-connected-header">
-                            <div class="bt-device-name" id="btDeviceName">
-                                <i class="fa-brands fa-bluetooth-b" style="color: #A78BFA;"></i> Paired BLE Device
-                            </div>
-                            <div class="bt-status-live">
-                                <span class="pulse-dot"></span> Active GATT Link
-                            </div>
-                        </div>
-                        <div class="bt-device-meta" id="btDeviceMeta" style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
-                            Device Identifier: <code id="btDeviceIdPreview">—</code>
-                        </div>
-                        <div class="bt-challenge-preview" id="btChallengeDisplay">
-                            Awaiting server challenge...
-                        </div>
-                        <div style="display: flex; gap: 8px; margin-top: 12px;">
-                            <button type="button" id="btVerifyBtn" class="passkey-btn staff-btn" style="flex: 1; margin: 0; font-size: 13px;">
-                                <i class="fa-solid fa-circle-check"></i> Verify Proximity &amp; Sign In
-                            </button>
-                            <button type="button" id="btDisconnectBtn" class="btn btn-secondary" style="padding: 10px 14px;" title="Disconnect Bluetooth Authenticator">
-                                <i class="fa-solid fa-link-slash"></i>
-                            </button>
-                        </div>
                     </div>
                 </div>
 
@@ -257,7 +267,7 @@
 
                 <div class="auth-notice-card warning" style="margin-top: 14px;">
                     <i class="fa-solid fa-triangle-exclamation"></i>
-                    <strong>Anti-Spoofing Protocol:</strong> Bluetooth proximity is cryptographically verified via single-use nonces and mutual authentication.
+                    <strong>Anti-Spoofing Protocol:</strong> Bluetooth proximity alone is not proof of identity. An ephemeral cryptographic non-repudiation challenge is verified by the CyberNova authentication server.
                 </div>
             </div>
 

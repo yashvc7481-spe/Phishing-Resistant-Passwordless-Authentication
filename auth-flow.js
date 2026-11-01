@@ -61,6 +61,21 @@ export class CyberNovaAuth {
         this.btStatusLabel = document.getElementById("btStatusLabel");
         this.btActionButtonsRow = document.getElementById("btActionButtonsRow");
 
+        // Direct Scanner UI — availability badge, step strip, discovered card, retry
+        this.btAvailabilityBadge = document.getElementById("btAvailabilityBadge");
+        this.btAvailabilityText  = document.getElementById("btAvailabilityText");
+        this.btStep1 = document.getElementById("btStep1");
+        this.btStep2 = document.getElementById("btStep2");
+        this.btStep3 = document.getElementById("btStep3");
+        this.btStep4 = document.getElementById("btStep4");
+        this.btDiscoveredCard       = document.getElementById("btDiscoveredCard");
+        this.btDiscoveredDeviceName = document.getElementById("btDiscoveredDeviceName");
+        this.btDiscoveredDeviceId   = document.getElementById("btDiscoveredDeviceId");
+        this.btDiscoveredServices   = document.getElementById("btDiscoveredServices");
+        this.btnBluetoothAuthenticate = document.getElementById("btnBluetoothAuthenticate");
+        this.btRetryRow             = document.getElementById("btRetryRow");
+        this.btnBluetoothRetry      = document.getElementById("btnBluetoothRetry");
+
         // Fallback elements
         this.btnFallbackVerify = document.getElementById("fallbackVerifyBtn");
         this.fallbackCodeInput = document.getElementById("fallbackCode");
@@ -162,6 +177,86 @@ export class CyberNovaAuth {
                 "info"
             );
         }
+        // Populate availability badge after mode is selected
+        this.updateAvailabilityBadge();
+
+        // Listen for adapter toggling (Chrome supports this event)
+        if (navigator.bluetooth?.addEventListener) {
+            try {
+                navigator.bluetooth.addEventListener("availabilitychanged", () => {
+                    navigator.bluetooth.getAvailability?.().then(avail => {
+                        this.capabilities.bluetoothAdapterAvailable = avail;
+                        this.capabilities.webBluetooth = this.capabilities.hasWebBluetooth && avail !== false;
+                        this.updateAvailabilityBadge();
+                    }).catch(() => {});
+                });
+            } catch (_) {}
+        }
+    }
+
+    /**
+     * Update the availability indicator badge (#btAvailabilityBadge) inside the
+     * Bluetooth panel to reflect current Bluetooth state.
+     */
+    updateAvailabilityBadge() {
+        const badge = this.btAvailabilityBadge;
+        const text  = this.btAvailabilityText;
+        if (!badge || !text) return;
+
+        // Reset classes
+        badge.className = "badge";
+
+        if (!this.capabilities.isSecureContext) {
+            badge.classList.add("badge-bt-https");
+            badge.innerHTML = `<i class="fa-solid fa-lock-open"></i> HTTPS Required`;
+            text.textContent = "Web Bluetooth requires a secure context (HTTPS or localhost).";
+        } else if (!this.capabilities.hasWebBluetooth) {
+            badge.classList.add("badge-bt-unsupported");
+            badge.innerHTML = `<i class="fa-solid fa-ban"></i> Browser Unsupported`;
+            text.textContent = "Use Google Chrome, Edge, or Opera on Desktop/Android.";
+        } else if (this.capabilities.bluetoothAdapterAvailable === false) {
+            badge.classList.add("badge-bt-off");
+            badge.innerHTML = `<i class="fa-brands fa-bluetooth-b"></i> Bluetooth Off`;
+            text.textContent = "Enable Bluetooth in your OS settings and refresh.";
+        } else {
+            badge.classList.add("badge-bt-available");
+            badge.innerHTML = `<i class="fa-brands fa-bluetooth-b"></i> Bluetooth Available`;
+            text.textContent = "BLE adapter detected · Ready to scan for authenticators.";
+        }
+    }
+
+    /**
+     * Update the 4-step progress strip.
+     * @param {number} activeStep - 1-4 (the currently active step). 0 = reset all.
+     * @param {boolean} [failed=false] - Mark activeStep as error state.
+     */
+    setStepProgress(activeStep, failed = false) {
+        const steps = [this.btStep1, this.btStep2, this.btStep3, this.btStep4];
+        steps.forEach((el, idx) => {
+            if (!el) return;
+            el.classList.remove("active", "done", "error");
+            const stepNum = idx + 1;
+            if (activeStep === 0) return; // full reset
+            if (stepNum < activeStep) {
+                el.classList.add("done");
+            } else if (stepNum === activeStep) {
+                el.classList.add(failed ? "error" : "active");
+            }
+        });
+    }
+
+    /**
+     * Reset scanner to idle state (hide discovered card, show action buttons,
+     * hide retry button, reset step strip).
+     */
+    resetScannerToIdle() {
+        this.btDiscoveredCard?.classList.add("hidden");
+        this.btConnectedCard?.classList.add("hidden");
+        this.btActionButtonsRow?.classList.remove("hidden");
+        this.btRetryRow?.classList.add("hidden");
+        this.setStepProgress(0);
+        this._pendingDevice = null;
+        this._pendingSigningKey = null;
     }
 
     switchTab(mode) {
@@ -247,6 +342,19 @@ export class CyberNovaAuth {
         this.btnBluetoothDisconnect?.addEventListener("click", (e) => {
             e.preventDefault();
             this.disconnectBluetooth();
+        });
+
+        // 6. Direct Scanner — Connect & Authenticate (from discovered card)
+        this.btnBluetoothAuthenticate?.addEventListener("click", (e) => {
+            e.preventDefault();
+            this._proceedWithGattConnect();
+        });
+
+        // 7. Retry Scan
+        this.btnBluetoothRetry?.addEventListener("click", (e) => {
+            e.preventDefault();
+            this.resetScannerToIdle();
+            this.handleBluetoothConnect({ isDemo: false });
         });
 
         // 6. Emergency Fallback Verification
@@ -507,6 +615,46 @@ export class CyberNovaAuth {
         }
         if (this.btRadarTitle) this.btRadarTitle.textContent = radarTitle;
         if (this.btRadarSubtitle) this.btRadarSubtitle.textContent = radarSubtitle;
+
+        // ── Step strip & retry button ─────────────────────────────────────
+        const showRetry = ["Authentication Failed", "Bluetooth Not Available", "Device Disconnected"].includes(status);
+        if (this.btRetryRow) {
+            this.btRetryRow.classList.toggle("hidden", !showRetry);
+        }
+
+        switch (status) {
+            case "Scanning for Devices":
+                this.setStepProgress(1);
+                break;
+            case "Device Found":
+                this.setStepProgress(2);
+                break;
+            case "Connecting":
+                this.setStepProgress(3);
+                break;
+            case "Authenticating":
+                this.setStepProgress(4);
+                break;
+            case "Authentication Successful":
+                // Mark all 4 steps done
+                [this.btStep1, this.btStep2, this.btStep3, this.btStep4].forEach(el => {
+                    el?.classList.remove("active", "error");
+                    el?.classList.add("done");
+                });
+                break;
+            case "Authentication Failed":
+                this.setStepProgress(4, true);
+                break;
+            case "Device Disconnected":
+            case "Bluetooth Available":
+                this.setStepProgress(0);
+                break;
+            case "Bluetooth Not Available":
+                this.setStepProgress(1, true);
+                break;
+            default:
+                break;
+        }
     }
 
     async handleBluetoothConnect({ isDemo = false } = {}) {
@@ -519,12 +667,14 @@ export class CyberNovaAuth {
         try {
             if (this.btnBluetoothConnect) this.btnBluetoothConnect.disabled = true;
             if (this.btnBluetoothDemo) this.btnBluetoothDemo.disabled = true;
+            // Hide retry while scanning
+            if (this.btRetryRow) this.btRetryRow.classList.add("hidden");
 
             let device = null;
             let signingKey = null;
 
             if (isDemo) {
-                // Synthetic / Virtual BLE Hardware Token with genuine cryptographic keypair
+                // ── Demo / Virtual BLE Hardware Token with genuine ECDSA keypair ─
                 this.setScannerState("Scanning for Devices", "Discovering simulated hardware token");
                 this.showStatus("<i class='fa-solid fa-spinner fa-spin'></i> Scanning 2.4 GHz channels for virtual <strong>Titan Security BLE Token</strong>...", "info");
                 await new Promise(r => setTimeout(r, 450));
@@ -542,16 +692,15 @@ export class CyberNovaAuth {
                         pkcs8: "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgj3OZ1lDndLmqlA8r2VWwWnlotLVuG1hkSPpiC1RDSaGhRANCAARAK2yKY0YlX0PFRJZ47OugdA1uMM5h2NG4ymOj2K1BPBZfHVI1TK0Bv9tuy3l0keWQj3BKpsmsYPHF4pTLnx56"
                     };
 
-                device = {
-                    id: demoConfig.id,
-                    name: demoConfig.name,
-                    isVirtual: true
-                };
+                device = { id: demoConfig.id, name: demoConfig.name, isVirtual: true };
 
+                // Show "Device Found" intermediate card
                 this.setScannerState("Device Found", device.name);
+                this._showDiscoveredCard(device, "Virtual FIDO2 Token · ECDSA P-256");
                 await new Promise(r => setTimeout(r, 300));
 
                 this.setScannerState("Connecting", `Establishing GATT link to ${device.name}`);
+                this.btDiscoveredCard?.classList.add("hidden");
                 await new Promise(r => setTimeout(r, 300));
 
                 // Import Demo PKCS8 Private Key for genuine cryptographic signing
@@ -568,7 +717,7 @@ export class CyberNovaAuth {
                 );
 
             } else {
-                // Real Web Bluetooth API Flow
+                // ── Real Web Bluetooth API Flow ────────────────────────────────
                 if (!window.isSecureContext) {
                     this.setScannerState("Bluetooth Not Available", "HTTPS Required");
                     this.showStatus("❌ <strong>HTTPS Required:</strong> Web Bluetooth API requires a secure context (HTTPS or localhost).", "error");
@@ -598,7 +747,7 @@ export class CyberNovaAuth {
                 this.setScannerState("Scanning for Devices", "Select your BLE authenticator in the browser dialog");
                 this.showStatus("<i class='fa-brands fa-bluetooth-b fa-spin'></i> <strong>Scanning for Devices:</strong> Please select your BLE hardware token in the browser device chooser...", "info");
 
-                // Request device with full service list
+                // Phase 1: Open OS-native device chooser — blocks until user picks or cancels
                 device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: [
@@ -610,77 +759,26 @@ export class CyberNovaAuth {
                     ]
                 });
 
+                // Phase 2: Show Discovered Device Card — user sees device info before GATT connect
                 this.setScannerState("Device Found", device.name || "Bluetooth Peripheral");
-                this.setScannerState("Connecting", `GATT connecting to ${device.name || "BLE Authenticator"}...`);
+                this._showDiscoveredCard(device, "Checking GATT services…");
+                this.showStatus(
+                    `<i class='fa-brands fa-bluetooth-b'></i> <strong>Device Found:</strong> <em>${device.name || "Bluetooth Device"}</em> — Click <strong>Connect &amp; Authenticate</strong> to establish the GATT link.`,
+                    "info"
+                );
 
-                // Connect to GATT Server
-                let gattServer = null;
-                let discoveredServices = [];
-                let hasCryptoService = false;
+                // Store pending device so "Connect & Authenticate" can pick it up
+                this._pendingDevice = device;
+                this._pendingSigningKey = null;
 
-                if (device.gatt) {
-                    try {
-                        gattServer = await device.gatt.connect();
-                        this.activeBluetoothServer = gattServer;
-
-                        // Service and characteristic discovery
-                        try {
-                            discoveredServices = await gattServer.getPrimaryServices();
-                            for (const svc of discoveredServices) {
-                                const uuidStr = String(svc.uuid).toLowerCase();
-                                if (uuidStr.includes("fffd") || uuidStr.includes("6e40")) {
-                                    hasCryptoService = true;
-                                }
-                                try {
-                                    await svc.getCharacteristics();
-                                } catch (eChar) {}
-                            }
-                        } catch (eSvc) {
-                            console.warn("GATT service enumeration notice:", eSvc);
-                        }
-                    } catch (gattErr) {
-                        console.warn("GATT connection warning:", gattErr);
-                    }
-                }
-
-                // Register disconnection listener
-                device.addEventListener("gattserverdisconnected", () => {
-                    this.onBluetoothDisconnected();
-                });
-
-                // Check for registered cryptographic key in local storage / IndexedDB
-                signingKey = await this.getStoredBleKey(device.id);
-                device.hasCryptoService = hasCryptoService;
+                // Re-enable buttons now that chooser is dismissed
+                if (this.btnBluetoothConnect) this.btnBluetoothConnect.disabled = false;
+                if (this.btnBluetoothDemo) this.btnBluetoothDemo.disabled = false;
+                return; // Wait for user to click "Connect & Authenticate"
             }
 
-            this.activeBluetoothDevice = device;
-            this.activeSigningKey = signingKey;
-
-            // Request Ephemeral Single-Use Cryptographic Challenge from CyberNova Server
-            this.showStatus("<i class='fa-solid fa-lock'></i> Requesting single-use cryptographic challenge from server...", "info");
-
-            const challengeRes = await fetch("/api/auth/bluetooth/challenge", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    email,
-                    deviceName: device.name || "Bluetooth Proximity Token",
-                    deviceId: device.id
-                })
-            });
-
-            const challengeData = await this.safeParseJson(challengeRes);
-            if (!challengeRes.ok) throw new Error(challengeData.error || "Failed to generate Bluetooth challenge.");
-
-            this.currentBluetoothSession = challengeData;
-
-            // Render connected state and ready for cryptographic challenge signing
-            this.renderBluetoothConnectedState(device, challengeData);
-            this.setScannerState("Authenticating", "Challenge Ready · Proximity Active");
-            this.showStatus(
-                "🔗 <strong>Bluetooth Device Linked!</strong> Ephemeral challenge nonce received. Click <strong>'Verify Proximity & Sign In'</strong> to cryptographically sign and complete authentication.",
-                "info"
-            );
+            // ── Shared final path (demo only reaches here) ─────────────────
+            await this._requestChallengeAndShowCard(device, signingKey);
 
         } catch (err) {
             console.error("Bluetooth connection error:", err);
@@ -698,6 +796,133 @@ export class CyberNovaAuth {
             if (this.btnBluetoothConnect) this.btnBluetoothConnect.disabled = false;
             if (this.btnBluetoothDemo) this.btnBluetoothDemo.disabled = false;
         }
+    }
+
+    /**
+     * Populate and show the Discovered Device Card.
+     */
+    _showDiscoveredCard(device, servicesLabel) {
+        if (!this.btDiscoveredCard) return;
+        if (this.btDiscoveredDeviceName) {
+            const icon = `<i class="fa-brands fa-bluetooth-b" style="color: #38BDF8;"></i>`;
+            this.btDiscoveredDeviceName.innerHTML = `${icon} ${device.name || "Bluetooth Device"}`;
+        }
+        if (this.btDiscoveredDeviceId) {
+            this.btDiscoveredDeviceId.textContent = device.id
+                ? String(device.id).substring(0, 24)
+                : "BLE-DEVICE";
+        }
+        if (this.btDiscoveredServices) {
+            this.btDiscoveredServices.textContent = servicesLabel;
+        }
+        this.btDiscoveredCard.classList.remove("hidden");
+        this.btActionButtonsRow?.classList.add("hidden");
+    }
+
+    /**
+     * Called when user clicks "Connect & Authenticate" on the discovered device card.
+     * Performs real GATT connection, discovers services, then requests challenge.
+     */
+    async _proceedWithGattConnect() {
+        const device = this._pendingDevice;
+        if (!device) {
+            this.handleBluetoothConnect({ isDemo: false });
+            return;
+        }
+
+        if (this.btnBluetoothAuthenticate) this.btnBluetoothAuthenticate.disabled = true;
+
+        try {
+            this.setScannerState("Connecting", `GATT connecting to ${device.name || "BLE Authenticator"}...`);
+            this.showStatus("<i class='fa-solid fa-spinner fa-spin'></i> Establishing GATT connection and discovering services...", "info");
+
+            let hasCryptoService = false;
+
+            if (device.gatt) {
+                try {
+                    const gattServer = await device.gatt.connect();
+                    this.activeBluetoothServer = gattServer;
+
+                    try {
+                        const services = await gattServer.getPrimaryServices();
+                        const serviceNames = [];
+                        for (const svc of services) {
+                            const uuid = String(svc.uuid).toLowerCase();
+                            if (uuid.includes("fffd") || uuid.includes("6e40")) {
+                                hasCryptoService = true;
+                                serviceNames.push("FIDO2 Auth");
+                            } else if (uuid.includes("180a")) {
+                                serviceNames.push("Device Info");
+                            } else if (uuid.includes("180f")) {
+                                serviceNames.push("Battery");
+                            } else {
+                                serviceNames.push(uuid.substring(0, 8));
+                            }
+                            try { await svc.getCharacteristics(); } catch (_) {}
+                        }
+                        if (this.btDiscoveredServices) {
+                            this.btDiscoveredServices.textContent = serviceNames.length
+                                ? serviceNames.join(", ")
+                                : `${services.length} service(s)`;
+                        }
+                    } catch (eSvc) {
+                        console.warn("GATT service discovery:", eSvc);
+                        if (this.btDiscoveredServices) this.btDiscoveredServices.textContent = "Not enumerable";
+                    }
+                } catch (gattErr) {
+                    throw new Error(`GATT connection failed: ${gattErr.message || "Device refused connection"}`);
+                }
+            }
+
+            device.addEventListener("gattserverdisconnected", () => this.onBluetoothDisconnected());
+            device.hasCryptoService = hasCryptoService;
+
+            this.btDiscoveredCard?.classList.add("hidden");
+
+            const signingKey = await this.getStoredBleKey(device.id);
+            this._pendingDevice = null;
+
+            await this._requestChallengeAndShowCard(device, signingKey);
+
+        } catch (err) {
+            console.error("GATT connect error:", err);
+            this.setScannerState("Authentication Failed", err.message || "Connection failed");
+            this.showStatus(`❌ ${err.message || "Failed to connect to Bluetooth device."}`, "error");
+            if (this.btnBluetoothAuthenticate) this.btnBluetoothAuthenticate.disabled = false;
+        }
+    }
+
+    /**
+     * Common final path: fetch challenge from backend, render connected card.
+     */
+    async _requestChallengeAndShowCard(device, signingKey) {
+        const email = this.getEmail();
+        this.activeBluetoothDevice = device;
+        this.activeSigningKey = signingKey;
+
+        this.showStatus("<i class='fa-solid fa-lock'></i> Requesting single-use cryptographic challenge from server...", "info");
+
+        const challengeRes = await fetch("/api/auth/bluetooth/challenge", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                email,
+                deviceName: device.name || "Bluetooth Proximity Token",
+                deviceId: device.id
+            })
+        });
+
+        const challengeData = await this.safeParseJson(challengeRes);
+        if (!challengeRes.ok) throw new Error(challengeData.error || "Failed to generate Bluetooth challenge.");
+
+        this.currentBluetoothSession = challengeData;
+
+        this.renderBluetoothConnectedState(device, challengeData);
+        this.setScannerState("Authenticating", "Challenge Ready · Proximity Active");
+        this.showStatus(
+            "🔗 <strong>Bluetooth Device Linked!</strong> Ephemeral challenge nonce received. Click <strong>'Verify Proximity &amp; Sign In'</strong> to cryptographically sign and complete authentication.",
+            "info"
+        );
     }
 
     renderBluetoothConnectedState(device, challengeData) {
@@ -824,9 +1049,12 @@ export class CyberNovaAuth {
         this.activeBluetoothServer = null;
         this.activeSigningKey = null;
         this.currentBluetoothSession = null;
-        this.setScannerState("Device Disconnected", "Scanner Ready");
+        this._pendingDevice = null;
         this.btConnectedCard?.classList.add("hidden");
+        this.btDiscoveredCard?.classList.add("hidden");
         this.btActionButtonsRow?.classList.remove("hidden");
+        this.setScannerState("Device Disconnected", "Scanner Ready");
+        this.setStepProgress(0);
     }
 
     // ─────────────────────────────────────────────────────────────

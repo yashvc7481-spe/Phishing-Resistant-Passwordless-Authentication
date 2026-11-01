@@ -1764,28 +1764,6 @@ footer {
     animation: blink-dot 1.4s infinite;
 }
 
-/* QR Code Bluetooth Authenticator */
-.bt-qr-auth-container {
-    background: var(--bg-secondary);
-    border: 1px solid rgba(56, 189, 248, 0.3);
-    border-radius: var(--radius-lg);
-    padding: 18px 16px;
-    margin-bottom: 14px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-.qr-code-frame {
-    background: #0B1220;
-    border: 1px dashed rgba(56, 189, 248, 0.4);
-    border-radius: var(--radius);
-    padding: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 8px;
-    min-height: 220px;
-}
-
 .bluetooth-radar-box.is-scanning .bt-radar-ring {
     animation-duration: 3s !important;
     border-color: #38BDF8;
@@ -1849,4 +1827,131 @@ footer {
 }
 .staff-theme .auth-mode-switch-link:hover {
     color: #C4B5FD;
+}
+
+
+/* ─── Bluetooth Direct Scanner UI ─────────────────────────────── */
+
+/* Step Progress Strip */
+.bt-step {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 9px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    font-size: 11px;
+    color: var(--text-muted);
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    flex: 1;
+    justify-content: center;
+}
+
+.bt-step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.bt-step-label {
+    font-weight: 500;
+}
+
+.bt-step-divider {
+    flex: 0 0 12px;
+    height: 1px;
+    background: rgba(255,255,255,0.12);
+}
+
+/* Active step — current in-progress */
+.bt-step.active {
+    background: rgba(2, 132, 199, 0.18);
+    border-color: rgba(56, 189, 248, 0.45);
+    color: #38BDF8;
+}
+
+.bt-step.active .bt-step-num {
+    background: #0284C7;
+    color: #fff;
+}
+
+/* Completed step */
+.bt-step.done {
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.35);
+    color: var(--success);
+}
+
+.bt-step.done .bt-step-num::after {
+    content: "✓";
+    font-size: 9px;
+}
+
+.bt-step.done .bt-step-num {
+    background: var(--success);
+    color: #fff;
+    font-size: 0; /* hide original number */
+}
+
+/* Failed step */
+.bt-step.error {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #F87171;
+}
+
+.bt-step.error .bt-step-num {
+    background: #DC2626;
+    color: #fff;
+}
+
+/* Staff theme overrides for steps */
+.staff-theme .bt-step.active {
+    background: rgba(124, 58, 237, 0.15);
+    border-color: rgba(167, 139, 250, 0.45);
+    color: #A78BFA;
+}
+
+.staff-theme .bt-step.active .bt-step-num {
+    background: #7C3AED;
+}
+
+/* Availability badge states */
+.badge-bt-available {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10B981;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.badge-bt-off {
+    background: rgba(239, 68, 68, 0.15);
+    color: #F87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.badge-bt-https {
+    background: rgba(245, 158, 11, 0.15);
+    color: #F59E0B;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-bt-unsupported {
+    background: rgba(148, 163, 184, 0.12);
+    color: #94A3B8;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+/* Pulse indicator unsupported state */
+.bt-pulse-indicator.unsupported {
+    background: #EF4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+    animation: none;
 }
