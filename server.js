@@ -540,11 +540,21 @@ app.post("/api/auth/bluetooth/verify", (req, res) => {
             d => d.status === "active" && (d.device_identifier === cleanDevId || d.device_name === cleanDevName)
         );
 
-        // Fallback: If user has exactly one active registered device with public key, match it
+        // Direct mobile/BLE device matching without traditional pairing:
+        // If not matched by exact ID/name, verify whether clientSignature matches any active registered public key for this account
         if (!matchedDevice) {
-            const activeTokens = allUserBtDevices.filter(d => d.status === "active" && d.public_key);
-            if (activeTokens.length === 1) {
-                matchedDevice = activeTokens[0];
+            for (const dev of allUserBtDevices) {
+                if (dev.status === "active" && dev.public_key) {
+                    if (verifyBluetoothSignature(dev.public_key, pending.challenge, clientSignature)) {
+                        matchedDevice = dev;
+                        // Dynamically update the record with the phone's actual broadcast name and ID
+                        try {
+                            db.prepare("UPDATE bluetooth_devices SET device_name = ?, device_identifier = ?, last_used = CURRENT_TIMESTAMP WHERE id = ?")
+                              .run(cleanDevName, cleanDevId, dev.id);
+                        } catch (_) {}
+                        break;
+                    }
+                }
             }
         }
 

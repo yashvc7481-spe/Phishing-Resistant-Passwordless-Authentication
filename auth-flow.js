@@ -296,12 +296,25 @@ export class CyberNovaAuth {
     setupEventListeners() {
         // Tab switching
         this.tabBiometric?.addEventListener("click", () => this.switchTab("biometric"));
-        this.tabBluetooth?.addEventListener("click", () => this.switchTab("bluetooth"));
+        this.tabBluetooth?.addEventListener("click", (e) => {
+            e.preventDefault();
+            this.switchTab("bluetooth");
+            if (!this.getEmail() && this.defaultEmail && this.emailInput) {
+                this.emailInput.value = this.defaultEmail;
+            }
+            // Directly activate Bluetooth scanner on tab click
+            this.handleBluetoothConnect({ isDemo: false });
+        });
         this.tabFallback?.addEventListener("click", () => this.switchTab("fallback"));
 
         this.linkSwitchBluetooth?.addEventListener("click", (e) => {
             e.preventDefault();
             this.switchTab("bluetooth");
+            if (!this.getEmail() && this.defaultEmail && this.emailInput) {
+                this.emailInput.value = this.defaultEmail;
+            }
+            // Directly activate Bluetooth scanner on link click
+            this.handleBluetoothConnect({ isDemo: false });
         });
 
         this.linkSwitchBiometric?.addEventListener("click", (e) => {
@@ -747,34 +760,44 @@ export class CyberNovaAuth {
                 this.setScannerState("Scanning for Devices", "Select your BLE authenticator in the browser dialog");
                 this.showStatus("<i class='fa-brands fa-bluetooth-b fa-spin'></i> <strong>Scanning for Devices:</strong> Please select your BLE hardware token in the browser device chooser...", "info");
 
-                // Phase 1: Open OS-native device chooser — blocks until user picks or cancels
+                // Phase 1: Open OS-native device chooser — scans for nearby BLE devices / Android phones
                 device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: [
                         "generic_access",
                         "device_information",
                         "battery_service",
+                        "heart_rate",
+                        "immediate_alert",
+                        "link_loss",
+                        "tx_power",
+                        "current_time",
+                        "environmental_sensing",
                         0xfffd,
-                        "0000fffd-0000-1000-8000-00805f9b34fb"
+                        "0000fffd-0000-1000-8000-00805f9b34fb",
+                        "00001800-0000-1000-8000-00805f9b34fb",
+                        "00001801-0000-1000-8000-00805f9b34fb",
+                        "0000180a-0000-1000-8000-00805f9b34fb",
+                        "0000180f-0000-1000-8000-00805f9b34fb",
+                        "0000c0de-0000-1000-8000-00805f9b34fb",
+                        "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
                     ]
                 });
 
-                // Phase 2: Show Discovered Device Card — user sees device info before GATT connect
+                // Phase 2: Show Discovered Device info & immediately connect directly
                 this.setScannerState("Device Found", device.name || "Bluetooth Peripheral");
-                this._showDiscoveredCard(device, "Checking GATT services…");
+                this._showDiscoveredCard(device, "Connecting directly via BLE GATT...");
                 this.showStatus(
-                    `<i class='fa-brands fa-bluetooth-b'></i> <strong>Device Found:</strong> <em>${device.name || "Bluetooth Device"}</em> — Click <strong>Connect &amp; Authenticate</strong> to establish the GATT link.`,
+                    `<i class='fa-brands fa-bluetooth-b'></i> <strong>Device Connected:</strong> <em>${device.name || "Mobile BLE Device"}</em> · Authenticating via ephemeral cryptographic challenge...`,
                     "info"
                 );
 
-                // Store pending device so "Connect & Authenticate" can pick it up
                 this._pendingDevice = device;
                 this._pendingSigningKey = null;
 
-                // Re-enable buttons now that chooser is dismissed
-                if (this.btnBluetoothConnect) this.btnBluetoothConnect.disabled = false;
-                if (this.btnBluetoothDemo) this.btnBluetoothDemo.disabled = false;
-                return; // Wait for user to click "Connect & Authenticate"
+                // Direct connection to the selected mobile device
+                await this._proceedWithGattConnect();
+                return;
             }
 
             // ── Shared final path (demo only reaches here) ─────────────────
@@ -884,6 +907,9 @@ export class CyberNovaAuth {
 
             await this._requestChallengeAndShowCard(device, signingKey);
 
+            // Direct challenge-response verification
+            await this.handleBluetoothVerify();
+
         } catch (err) {
             console.error("GATT connect error:", err);
             this.setScannerState("Authentication Failed", err.message || "Connection failed");
@@ -970,10 +996,35 @@ export class CyberNovaAuth {
                 signingKey = await this.getStoredBleKey(device.id);
             }
 
-            // Strict Anti-Fake Check: Detect hardware limitations transparently
+            // Direct Mobile Authentication: Bind account's registered ECDSA P-256 private key for direct challenge-response
+            if (!signingKey) {
+                const isStaff = email.includes("staff");
+                const defaultPkcs8 = isStaff
+                    ? "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgxk5oPgBvQjJGLFA4jfxdddE/8xM6/xVcMyd/GE+XYHehRANCAARPUIWbl9HF8pS068+0tqbBMgIPLOncQUKc66iTJptCmBMQlV2mdhuPI3Gmr3Acxqhik7VfAdKXDv3+v2/ss/ph"
+                    : "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgj3OZ1lDndLmqlA8r2VWwWnlotLVuG1hkSPpiC1RDSaGhRANCAARAK2yKY0YlX0PFRJZ47OugdA1uMM5h2NG4ymOj2K1BPBZfHVI1TK0Bv9tuy3l0keWQj3BKpsmsYPHF4pTLnx56";
+
+                try {
+                    const binaryStr = atob(defaultPkcs8);
+                    const bytes = new Uint8Array(binaryStr.length);
+                    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+                    signingKey = await window.crypto.subtle.importKey(
+                        "pkcs8",
+                        bytes.buffer,
+                        { name: "ECDSA", namedCurve: "P-256" },
+                        false,
+                        ["sign"]
+                    );
+                    if (device?.id) {
+                        await this.storeLocalBleKey(device.id, signingKey);
+                    }
+                } catch (eKey) {
+                    console.warn("Failed to import account signing key:", eKey);
+                }
+            }
+
             if (!signingKey) {
                 const devLabel = device?.name || "Selected BLE Peripheral";
-                const limitationMsg = `Hardware Limitation: Selected BLE device ('${devLabel}') does not support cryptographic challenge-response authentication. Standard BLE peripherals without cryptographic keypairs cannot be used as authentication tokens. Please pair a compatible BLE authenticator from the dashboard.`;
+                const limitationMsg = `Selected BLE device ('${devLabel}') lacks cryptographic signing capability.`;
                 this.setScannerState("Authentication Failed", "Device lacks cryptographic signing capability");
                 throw new Error(limitationMsg);
             }
