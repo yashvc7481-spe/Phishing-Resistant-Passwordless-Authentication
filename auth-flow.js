@@ -99,24 +99,9 @@ export class CyberNovaAuth {
         }
 
         // 3. Web Bluetooth API
-        // navigator.bluetooth is only exposed when:
-        //   a) The page is a secure context (HTTPS or localhost)
-        //   b) The browser supports Web Bluetooth (Chrome/Edge/Opera desktop or Android)
-        //   c) No Permissions-Policy header is blocking it (production deployments MUST
-        //      send "Permissions-Policy: bluetooth=*" or navigator.bluetooth is undefined)
-        this.capabilities.isSecureContext = (typeof window !== "undefined" && window.isSecureContext === true);
         this.capabilities.webBluetooth = typeof navigator !== "undefined" &&
             !!navigator.bluetooth &&
             typeof navigator.bluetooth.requestDevice === "function";
-
-        // Async: check physical adapter availability (non-blocking — updates badge later)
-        if (this.capabilities.webBluetooth && navigator.bluetooth.getAvailability) {
-            navigator.bluetooth.getAvailability().then(available => {
-                this.capabilities.bluetoothAdapterAvailable = available;
-            }).catch(() => {
-                this.capabilities.bluetoothAdapterAvailable = null;
-            });
-        }
     }
 
     renderCapabilityBadges() {
@@ -130,24 +115,16 @@ export class CyberNovaAuth {
 
         const btClass = this.capabilities.webBluetooth ? "supported" : "unsupported";
         const btIcon = this.capabilities.webBluetooth ? "fa-bluetooth-b" : "fa-ban";
-        let btText, btTitle;
-        if (this.capabilities.webBluetooth) {
-            btText = "Web Bluetooth API: Supported";
-            btTitle = "Chromium Web Bluetooth GATT API supported";
-        } else if (!this.capabilities.isSecureContext) {
-            btText = "Bluetooth: HTTPS Required";
-            btTitle = "Web Bluetooth API requires a secure context (HTTPS or localhost)";
-        } else {
-            btText = "Bluetooth is not supported in this browser. Please use a compatible browser such as Google Chrome and enable Bluetooth.";
-            btTitle = "navigator.bluetooth is unavailable — use Chrome/Edge/Opera, or ensure the server sends Permissions-Policy: bluetooth=*";
-        }
+        const btText = this.capabilities.webBluetooth
+            ? "Web Bluetooth API: Supported"
+            : "Web Bluetooth: Unsupported in this browser";
 
         this.capabilityBar.innerHTML = `
             <div class="capability-pill ${bioClass}" title="${this.capabilities.platformBiometrics ? 'Platform authenticator available (Touch ID, Windows Hello, Fingerprint)' : 'No platform biometric sensor detected'}">
                 <i class="fa-solid ${bioIcon}"></i>
                 <span>${bioText}</span>
             </div>
-            <div class="capability-pill ${btClass}" title="${btTitle}">
+            <div class="capability-pill ${btClass}" title="${this.capabilities.webBluetooth ? 'Chromium Web Bluetooth GATT API supported' : 'Browser does not expose navigator.bluetooth'}">
                 <i class="fa-brands ${btIcon}"></i>
                 <span>${btText}</span>
             </div>
@@ -594,40 +571,15 @@ export class CyberNovaAuth {
                     name: "Titan Security BLE Key (Demo Hardware Token)"
                 };
             } else {
-                // Real Web Bluetooth API check — diagnose why it may be unavailable
+                // Real Web Bluetooth API check
                 if (!this.capabilities.webBluetooth) {
-                    this.setScannerState("idle", "Bluetooth Not Available");
-
-                    // Diagnose: not a secure context (must be HTTPS or localhost)
-                    if (!this.capabilities.isSecureContext) {
-                        this.showStatus(
-                            "🔒 <strong>HTTPS Required for Bluetooth:</strong><br>" +
-                            "Web Bluetooth API only works on secure (HTTPS) pages or localhost.<br>" +
-                            "👉 Please access this site over <strong>HTTPS</strong> or use <strong>'Demo Token'</strong> to test without hardware.",
-                            "warning"
-                        );
-                    } else {
-                        // On HTTPS but navigator.bluetooth is still undefined —
-                        // most likely cause: missing Permissions-Policy header on the server
-                        // OR the browser does not support Web Bluetooth at all.
-                        const isChromeLike = /Chrome|Chromium|Edg|OPR/.test(navigator.userAgent);
-                        if (isChromeLike) {
-                            this.showStatus(
-                                "⚠️ <strong>Bluetooth Blocked by Browser Policy:</strong><br>" +
-                                "Your browser (Chrome/Edge/Opera) supports Web Bluetooth, but it is blocked on this page.<br>" +
-                                "The server must send <code>Permissions-Policy: bluetooth=*</code>. If you are seeing this on the live site, please contact the site owner.<br>" +
-                                "👉 Click <strong>'Demo Token'</strong> to test the full ceremony without physical hardware.",
-                                "warning"
-                            );
-                        } else {
-                            this.showStatus(
-                                "⚠️ <strong>Bluetooth is not supported in this browser.</strong><br>" +
-                                "Please use <strong>Google Chrome</strong>, Microsoft Edge, or Opera on Desktop or Android.<br>" +
-                                "👉 Click <strong>'Demo Token'</strong> to test the complete challenge-response ceremony without physical hardware, or use the <strong>Security Key</strong> tab.",
-                                "warning"
-                            );
-                        }
-                    }
+                    this.setScannerState("idle", "Web Bluetooth API Unsupported");
+                    this.showStatus(
+                        "⚠️ <strong>Web Bluetooth API Unavailable in this Browser:</strong><br>" +
+                        "Web Bluetooth is supported on Google Chrome, Microsoft Edge, and Opera on Desktop/Android.<br>" +
+                        "👉 Click <strong>'Demo Token'</strong> to test the complete challenge-response ceremony without physical hardware, or use the <strong>Security Key</strong> tab.",
+                        "warning"
+                    );
                     return;
                 }
 

@@ -72,3 +72,4 @@ This architecture ensures:
 1. First-party cookies are preserved without cross-site blocking in modern browsers (Safari, Chrome).
 2. WebAuthn origin and Relying Party ID match the frontend domain seamlessly.
 3. No manual CORS issues or hardcoded localhost URLs in client code.
+

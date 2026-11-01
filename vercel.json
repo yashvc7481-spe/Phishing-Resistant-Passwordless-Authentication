@@ -8,15 +8,7 @@
       "headers": [
         {
           "key": "Permissions-Policy",
-          "value": "bluetooth=*, camera=*, microphone=*, usb=*"
-        },
-        {
-          "key": "Feature-Policy",
-          "value": "bluetooth *; camera *; microphone *; usb *"
-        },
-        {
-          "key": "Cross-Origin-Opener-Policy",
-          "value": "same-origin-allow-popups"
+          "value": "bluetooth=(self)"
         }
       ]
     }

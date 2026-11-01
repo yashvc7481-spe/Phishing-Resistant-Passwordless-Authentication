@@ -587,30 +587,19 @@
     });
 
     btnStartBleScan?.addEventListener("click", async () => {
-        // Check secure context first (Web Bluetooth requires HTTPS or localhost)
-        if (!window.isSecureContext) {
-            alert("🔒 HTTPS Required: Web Bluetooth API only works on secure (HTTPS) pages or localhost.\n\nPlease access this site over HTTPS.");
-            return;
-        }
-
         if (!navigator.bluetooth) {
-            const isChromeLike = /Chrome|Chromium|Edg|OPR/.test(navigator.userAgent);
-            if (isChromeLike) {
-                alert("⚠️ Bluetooth is blocked by browser policy on this page.\n\nThe server must send a Permissions-Policy: bluetooth=* header.\n\nYou can click 'Pair Demo BLE Token' to test pairing without physical hardware.");
-            } else {
-                alert("Bluetooth is not supported in this browser. Please use a compatible browser such as Google Chrome and enable Bluetooth.\n\nYou can click 'Pair Demo BLE Token' instead.");
-            }
+            alert("Web Bluetooth API is not supported in this browser (Google Chrome, Microsoft Edge, or Opera required). You can click 'Pair Demo BLE Token' instead.");
             return;
         }
 
         try {
-            if (btPairScannerStatus) btPairScannerStatus.innerHTML = "<i class='fa-brands fa-bluetooth-b fa-spin' style='color:#38BDF8;'></i> <strong>Scanning for Devices</strong> — Select your BLE device in the browser dialog...";
+            if (btPairScannerStatus) btPairScannerStatus.innerHTML = "<i class='fa-brands fa-bluetooth-b fa-spin' style='color:#38BDF8;'></i> Scanning for discoverable Bluetooth devices...";
             const device = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
                 optionalServices: ["generic_access", "device_information", "battery_service"]
             });
 
-            if (btPairScannerStatus) btPairScannerStatus.innerHTML = `<i class='fa-solid fa-circle-dot' style='color:#38BDF8;'></i> <strong>Device Found:</strong> ${device.name || "BLE Authenticator"} — <i class='fa-solid fa-spinner fa-spin'></i> Connecting...`;
+            if (btPairScannerStatus) btPairScannerStatus.innerHTML = `<i class='fa-solid fa-spinner fa-spin'></i> Enrolling <strong>${device.name || "BLE Authenticator"}</strong> to account...`;
 
             const res = await fetch("/api/bluetooth/pair", {
                 method: "POST",
@@ -624,18 +613,13 @@
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to pair device.");
 
-            if (btPairScannerStatus) btPairScannerStatus.innerHTML = `<i class='fa-solid fa-circle-check' style='color:#22c55e;'></i> <strong>Connected Successfully:</strong> ${device.name || "BLE Authenticator"} enrolled.`;
             alert("✅ " + data.message);
             btPairingScannerBox?.classList.add("hidden");
             loadDashboard();
         } catch (err) {
             if (err.name === "NotFoundError") {
-                if (btPairScannerStatus) btPairScannerStatus.innerHTML = "<i class='fa-solid fa-circle-xmark' style='color:#f59e0b;'></i> Bluetooth pairing was canceled — no device selected.";
-            } else if (err.name === "SecurityError") {
-                if (btPairScannerStatus) btPairScannerStatus.innerHTML = "<i class='fa-solid fa-lock' style='color:#ef4444;'></i> <strong>Connection Failed:</strong> Bluetooth requires HTTPS and user permission.";
-                alert("Bluetooth access blocked: Web Bluetooth requires a secure (HTTPS) context and user permission.");
+                if (btPairScannerStatus) btPairScannerStatus.textContent = "Bluetooth pairing was canceled.";
             } else {
-                if (btPairScannerStatus) btPairScannerStatus.innerHTML = `<i class='fa-solid fa-circle-xmark' style='color:#ef4444;'></i> <strong>Connection Failed:</strong> ${err.message}`;
                 alert("Pairing Error: " + err.message);
             }
         }
