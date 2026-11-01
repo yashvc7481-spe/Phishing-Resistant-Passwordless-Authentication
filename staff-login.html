@@ -180,7 +180,7 @@
 
                 <!-- Scanner Step Progress -->
                 <div id="btStepStrip" style="display: flex; gap: 4px; margin-bottom: 12px; align-items: center;">
-                    <div id="btStep1" class="bt-step" title="Step 1: Scan">
+                    <div id="btStep1" class="bt-step active" title="Step 1: Scan">
                         <span class="bt-step-num">1</span><span class="bt-step-label">Scan</span>
                     </div>
                     <div class="bt-step-divider"></div>
@@ -197,8 +197,49 @@
                     </div>
                 </div>
 
-                <!-- Direct Scanner Discovered Devices Feed -->
-                <div id="btScannerDeviceFeed" style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <!-- Scanner Mode Toggle: QR Scanner vs BLE Scanner -->
+                <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+                    <button type="button" id="btnModeQr" class="btn btn-secondary" style="flex: 1; padding: 7px 10px; font-size: 11px; border-color: rgba(167, 139, 250, 0.4); background: rgba(167, 139, 250, 0.12); color: #A78BFA; font-weight: 600;">
+                        <i class="fa-solid fa-qrcode"></i> DIRECT QR SCANNER
+                    </button>
+                    <button type="button" id="btnModeBle" class="btn btn-secondary" style="flex: 1; padding: 7px 10px; font-size: 11px;">
+                        <i class="fa-brands fa-bluetooth-b"></i> BLE RADIO SCANNER
+                    </button>
+                </div>
+
+                <!-- Direct QR Code Scanner Card -->
+                <div id="btQrAuthCard" class="bt-connected-card" style="margin-bottom: 12px; border-color: rgba(167, 139, 250, 0.35); text-align: center; padding: 16px; background: rgba(15, 23, 42, 0.65);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
+                            <i class="fa-solid fa-qrcode" style="color: #A78BFA; margin-right: 4px;"></i> Scan with Android Mobile Phone
+                        </span>
+                        <span class="badge badge-purple" style="font-size: 10px; padding: 2px 7px;" id="btQrTimerBadge">
+                            <i class="fa-regular fa-clock"></i> <span id="btQrCountdown">90s</span>
+                        </span>
+                    </div>
+
+                    <div style="display: flex; justify-content: center; margin: 10px 0 12px 0;">
+                        <div style="padding: 10px; background: #FFFFFF; border-radius: 14px; display: inline-block; box-shadow: 0 4px 20px rgba(0,0,0,0.4); border: 2px solid #A78BFA;">
+                            <img id="btQrCodeImg" src="" alt="Proximity Authentication QR Code" style="width: 155px; height: 155px; display: block; border-radius: 4px;">
+                        </div>
+                    </div>
+
+                    <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+                        Point your Phone Camera or Google Lens
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;" id="btQrSubtext">
+                        Direct Proximity Authentication &middot; Instantly approves this computer session
+                    </div>
+
+                    <div style="display: flex; gap: 8px; justify-content: center;">
+                        <button type="button" id="btnRefreshQr" class="btn btn-secondary" style="padding: 6px 14px; font-size: 11px;">
+                            <i class="fa-solid fa-rotate-right"></i> Refresh QR Code
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Direct Scanner Discovered Devices Feed (hidden by default when in QR mode, toggled via btnModeBle) -->
+                <div id="btScannerDeviceFeed" class="hidden" style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
                         <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600;">
                             <i class="fa-solid fa-radar" style="color: #A78BFA; margin-right: 4px;"></i> Direct Scanner &middot; Detected Devices

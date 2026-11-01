@@ -77,6 +77,15 @@ export class CyberNovaAuth {
         this.btnBluetoothRetry      = document.getElementById("btnBluetoothRetry");
         this.btnConnectAndroidDirect  = document.getElementById("btnConnectAndroidDirect");
         this.btnConnectHardwareDirect = document.getElementById("btnConnectHardwareDirect");
+        this.btnModeQr                = document.getElementById("btnModeQr");
+        this.btnModeBle               = document.getElementById("btnModeBle");
+        this.btQrAuthCard             = document.getElementById("btQrAuthCard");
+        this.btScannerDeviceFeed      = document.getElementById("btScannerDeviceFeed");
+        this.btQrCodeImg              = document.getElementById("btQrCodeImg");
+        this.btQrCountdown            = document.getElementById("btQrCountdown");
+        this.btnRefreshQr             = document.getElementById("btnRefreshQr");
+        this.qrPollInterval           = null;
+        this.qrCountdownTimer         = null;
 
         // Fallback elements
         this.btnFallbackVerify = document.getElementById("fallbackVerifyBtn");
@@ -304,7 +313,8 @@ export class CyberNovaAuth {
             if (!this.getEmail() && this.defaultEmail && this.emailInput) {
                 this.emailInput.value = this.defaultEmail;
             }
-            this.setScannerState("Bluetooth Available", "Direct Scanner Ready · 2.4 GHz Channels Active");
+            this.setScannerState("Bluetooth Available", "Direct QR Scanner Active · Ready for Phone Scan");
+            this.setScannerUIMode("qr");
         });
         this.tabFallback?.addEventListener("click", () => this.switchTab("fallback"));
 
@@ -380,6 +390,24 @@ export class CyberNovaAuth {
         this.btnConnectHardwareDirect?.addEventListener("click", (e) => {
             e.preventDefault();
             this.handleBluetoothConnect({ isDemo: true });
+        });
+
+        // 10. Switch to Direct QR Scanner Mode
+        this.btnModeQr?.addEventListener("click", (e) => {
+            e.preventDefault();
+            this.setScannerUIMode("qr");
+        });
+
+        // 11. Switch to BLE Radio Scanner Mode
+        this.btnModeBle?.addEventListener("click", (e) => {
+            e.preventDefault();
+            this.setScannerUIMode("ble");
+        });
+
+        // 12. Refresh QR Code
+        this.btnRefreshQr?.addEventListener("click", (e) => {
+            e.preventDefault();
+            this.generateDirectQr();
         });
 
         // 6. Emergency Fallback Verification
@@ -687,6 +715,163 @@ export class CyberNovaAuth {
      * Establishes real BLE proximity session, requests single-use challenge nonce,
      * signs with account's ECDSA P-256 private key, and verifies on backend.
      */
+    /**
+     * Switch between "qr" mode and "ble" mode in the Bluetooth UI.
+     */
+    setScannerUIMode(mode = "qr") {
+        const isStaff = (this.getEmail() || this.defaultEmail).includes("staff");
+        const activeColor = isStaff ? "#A78BFA" : "#38BDF8";
+        const activeBg = isStaff ? "rgba(167, 139, 250, 0.12)" : "rgba(56, 189, 248, 0.12)";
+        const activeBorder = isStaff ? "rgba(167, 139, 250, 0.4)" : "rgba(56, 189, 248, 0.4)";
+
+        if (mode === "qr") {
+            if (this.btnModeQr) {
+                this.btnModeQr.style.color = activeColor;
+                this.btnModeQr.style.background = activeBg;
+                this.btnModeQr.style.borderColor = activeBorder;
+                this.btnModeQr.style.fontWeight = "600";
+            }
+            if (this.btnModeBle) {
+                this.btnModeBle.style.color = "";
+                this.btnModeBle.style.background = "";
+                this.btnModeBle.style.borderColor = "";
+                this.btnModeBle.style.fontWeight = "400";
+            }
+            this.btQrAuthCard?.classList.remove("hidden");
+            this.btScannerDeviceFeed?.classList.add("hidden");
+            this.generateDirectQr();
+        } else {
+            if (this.btnModeBle) {
+                this.btnModeBle.style.color = activeColor;
+                this.btnModeBle.style.background = activeBg;
+                this.btnModeBle.style.borderColor = activeBorder;
+                this.btnModeBle.style.fontWeight = "600";
+            }
+            if (this.btnModeQr) {
+                this.btnModeQr.style.color = "";
+                this.btnModeQr.style.background = "";
+                this.btnModeQr.style.borderColor = "";
+                this.btnModeQr.style.fontWeight = "400";
+            }
+            this.stopQrPolling();
+            this.btQrAuthCard?.classList.add("hidden");
+            this.btScannerDeviceFeed?.classList.remove("hidden");
+            this.setScannerState("Bluetooth Available", "BLE Radio Scanner Ready · 2.4 GHz Channels Active");
+        }
+    }
+
+    /**
+     * Generate dynamic QR Code for mobile proximity sign-in.
+     * Polls the backend until user approves on their mobile device.
+     */
+    async generateDirectQr() {
+        const email = this.getEmail() || this.defaultEmail;
+        if (this.emailInput && !this.emailInput.value) {
+            this.emailInput.value = email;
+        }
+
+        this.stopQrPolling();
+
+        try {
+            this.setScannerState("Scanning for Devices", "Generating Direct QR Proximity Session...");
+
+            const challengeRes = await fetch("/api/auth/bluetooth/challenge", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email,
+                    deviceName: "QR Mobile Authenticator",
+                    deviceId: "BLE-QR-" + Date.now()
+                })
+            });
+
+            const challengeData = await this.safeParseJson(challengeRes);
+            if (!challengeRes.ok) throw new Error(challengeData.error || "Failed to initialize QR session");
+
+            const sessionId = challengeData.sessionId;
+            this.currentBluetoothSession = challengeData;
+
+            // Generate full mobile auth URL
+            const mobileUrl = window.location.origin + "/mobile-auth.html?session=" + encodeURIComponent(sessionId) + "&email=" + encodeURIComponent(email);
+
+            // Render QR Code via clean SVG/PNG image
+            if (this.btQrCodeImg) {
+                this.btQrCodeImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=" + encodeURIComponent(mobileUrl) + "&margin=6&color=0-0-0&bgcolor=255-255-255";
+            }
+
+            this.setScannerState("Scanning for Devices", "Awaiting Mobile Scan · QR Active");
+            this.showStatus("<i class='fa-solid fa-qrcode fa-fade' style='color:#38BDF8;'></i> <strong>Direct QR Scanner Active:</strong> Scan the QR code with your Android phone camera to sign in.", "info");
+
+            // Start 90s countdown timer
+            let remaining = challengeData.expiresInSeconds || 90;
+            if (this.btQrCountdown) this.btQrCountdown.textContent = remaining + "s";
+
+            this.qrCountdownTimer = setInterval(() => {
+                remaining--;
+                if (this.btQrCountdown) this.btQrCountdown.textContent = Math.max(0, remaining) + "s";
+                if (remaining <= 0) {
+                    this.stopQrPolling();
+                    this.setScannerState("Authentication Failed", "QR Session Expired");
+                    this.showStatus("⚠️ QR Session Expired. Click <strong>Refresh QR Code</strong> to generate a new one.", "warning");
+                }
+            }, 1000);
+
+            // Start Polling for Mobile Approval
+            this.startQrPolling(sessionId);
+
+        } catch (err) {
+            console.error("QR Generation error:", err);
+            this.setScannerState("Authentication Failed", err.message || "Failed to generate QR code");
+            this.showStatus("❌ Failed to generate QR Code: " + err.message, "error");
+        }
+    }
+
+    /**
+     * Poll backend for mobile QR approval every 1.5 seconds.
+     */
+    startQrPolling(sessionId) {
+        this.stopQrPolling(false);
+
+        this.qrPollInterval = setInterval(async () => {
+            try {
+                const res = await fetch("/api/auth/bluetooth/session-status?sessionId=" + encodeURIComponent(sessionId));
+                if (!res.ok) {
+                    if (res.status === 404 || res.status === 400) {
+                        this.stopQrPolling();
+                    }
+                    return;
+                }
+
+                const data = await res.json();
+                if (data.status === "approved") {
+                    this.stopQrPolling();
+                    this.setScannerState("Authentication Successful", "Identity Verified via Mobile QR");
+                    this.showStatus("✅ <strong>Mobile Sign-In Approved!</strong> Proximity confirmed. Redirecting to dashboard...", "success");
+
+                    setTimeout(() => {
+                        window.location.href = data.redirect || "/student-dashboard.html";
+                    }, 800);
+                }
+            } catch (err) {
+                // Ignore transient network errors during polling
+            }
+        }, 1500);
+    }
+
+    /**
+     * Stop QR countdown and polling interval.
+     */
+    stopQrPolling(clearCountdown = true) {
+        if (this.qrPollInterval) {
+            clearInterval(this.qrPollInterval);
+            this.qrPollInterval = null;
+        }
+        if (clearCountdown && this.qrCountdownTimer) {
+            clearInterval(this.qrCountdownTimer);
+            this.qrCountdownTimer = null;
+        }
+    }
+
     async handleDirectMobileConnect() {
         const email = this.getEmail() || this.defaultEmail;
         if (this.emailInput && !this.emailInput.value) {

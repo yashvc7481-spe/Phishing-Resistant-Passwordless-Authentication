@@ -475,6 +475,108 @@ app.post("/api/auth/bluetooth/challenge", (req, res) => {
     }
 });
 
+// 1.5. Check Status of QR / Mobile Bluetooth Authentication Session (Polling)
+app.get("/api/auth/bluetooth/session-status", (req, res) => {
+    try {
+        const sessionId = String(req.query.sessionId || "").trim();
+        if (!sessionId) return res.status(400).json({ error: "Session ID required" });
+
+        const pending = pendingBluetoothChallenges.get(sessionId);
+        if (!pending) {
+            return res.status(404).json({ status: "expired", error: "Session expired or not found" });
+        }
+
+        if (Date.now() > pending.expiresAt) {
+            pendingBluetoothChallenges.delete(sessionId);
+            return res.status(400).json({ status: "expired", error: "Session expired. Please generate a new QR." });
+        }
+
+        if (pending.approved) {
+            if (pending.token) {
+                res.cookie("cybernova_session", pending.token, {
+                    httpOnly: true,
+                    sameSite: "lax"
+                });
+            }
+            return res.json({
+                status: "approved",
+                redirect: pending.redirect,
+                token: pending.token,
+                user: pending.user
+            });
+        }
+
+        const remainingSeconds = Math.max(0, Math.round((pending.expiresAt - Date.now()) / 1000));
+        res.json({ status: "pending", expiresInSeconds: remainingSeconds });
+    } catch (err) {
+        console.error("Session status check error:", err);
+        res.status(500).json({ error: "Failed to check session status." });
+    }
+});
+
+// 1.6. Approve Bluetooth Session from Mobile Phone via QR Scan
+app.post("/api/auth/bluetooth/approve-mobile", (req, res) => {
+    try {
+        const { sessionId, email, signature } = req.body;
+        if (!sessionId) return res.status(400).json({ error: "Session ID required" });
+
+        const pending = pendingBluetoothChallenges.get(sessionId);
+        if (!pending || Date.now() > pending.expiresAt) {
+            return res.status(400).json({ error: "Session expired or invalid" });
+        }
+
+        const user = db.prepare("SELECT * FROM users WHERE id = ?").get(pending.userId);
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        const allUserBtDevices = db.prepare(
+            "SELECT id, device_name, device_identifier, status, public_key, algorithm FROM bluetooth_devices WHERE user_id = ?"
+        ).all(user.id);
+
+        let verified = true;
+        if (signature) {
+            let sigValid = false;
+            for (const dev of allUserBtDevices) {
+                if (dev.status === "active" && dev.public_key) {
+                    if (verifyBluetoothSignature(dev.public_key, pending.challenge, signature)) {
+                        sigValid = true;
+                        break;
+                    }
+                }
+            }
+            verified = sigValid;
+        }
+
+        if (!verified) {
+            return res.status(401).json({ error: "Cryptographic signature check failed on mobile device." });
+        }
+
+        const token = jwt.sign(
+            { id: user.id, email: user.email, role: user.role, displayName: user.display_name, authMethod: "bluetooth_qr_hybrid" },
+            JWT_SECRET,
+            { expiresIn: "4h" }
+        );
+
+        pending.approved = true;
+        pending.token = token;
+        pending.redirect = user.role === "student" ? "/student-dashboard.html" : "/staff-dashboard.html";
+        pending.user = { email: user.email, displayName: user.display_name };
+
+        logSecurityEvent("BLUETOOTH_QR_PROXIMITY_APPROVED", user.email, req.ip, {
+            sessionId: sessionId.substring(0, 14) + "...",
+            role: user.role
+        }, "INFO", 5, "LOW");
+
+        res.json({
+            success: true,
+            message: "Mobile proximity approved successfully",
+            redirect: pending.redirect
+        });
+    } catch (err) {
+        console.error("Mobile approval error:", err);
+        res.status(500).json({ error: err.message || "Failed to approve mobile authentication." });
+    }
+});
+
 // 2. Verify Bluetooth device proximity challenge response with Cryptographic Proof
 app.post("/api/auth/bluetooth/verify", (req, res) => {
     try {

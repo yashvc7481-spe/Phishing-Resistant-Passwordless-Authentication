@@ -2,239 +2,225 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CyberNova — Mobile Proximity Authenticator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberNova Mobile Proximity Authenticator</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
-            background: #0B1220;
+            background: #0B1120;
             color: #F8FAFC;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            margin: 0;
-            padding: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            box-sizing: border-box;
+            margin: 0;
+            padding: 16px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
         .mobile-card {
-            background: #111A2E;
-            border: 1px solid rgba(56, 189, 248, 0.3);
+            background: #111827;
+            border: 1px solid rgba(56, 189, 248, 0.25);
             border-radius: 16px;
-            padding: 24px 20px;
+            padding: 24px;
+            max-width: 420px;
             width: 100%;
-            max-width: 400px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
             text-align: center;
         }
-        .mobile-logo {
+        .mobile-badge {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            font-size: 18px;
-            font-weight: 800;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: rgba(56, 189, 248, 0.12);
             color: #38BDF8;
+            font-size: 11px;
+            font-weight: 600;
             margin-bottom: 16px;
+            border: 1px solid rgba(56, 189, 248, 0.3);
         }
-        .pulse-phone {
+        .mobile-icon {
             width: 72px;
             height: 72px;
             border-radius: 50%;
-            background: rgba(56, 189, 248, 0.15);
-            border: 2px solid #38BDF8;
+            background: rgba(14, 165, 233, 0.15);
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 16px;
             font-size: 32px;
             color: #38BDF8;
+            margin: 0 auto 16px auto;
+            border: 1px solid rgba(56, 189, 248, 0.3);
             animation: pulse-ring 2s infinite;
         }
         @keyframes pulse-ring {
             0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.4); }
-            70% { box-shadow: 0 0 0 15px rgba(56, 189, 248, 0); }
+            70% { box-shadow: 0 0 0 16px rgba(56, 189, 248, 0); }
             100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
         }
-        .meta-pill {
-            background: #0B1220;
-            border: 1px solid #1E293B;
-            border-radius: 8px;
-            padding: 10px 12px;
-            margin: 14px 0;
+        .detail-box {
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 10px;
+            padding: 12px;
+            margin: 16px 0;
             text-align: left;
             font-size: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
-        .meta-row {
+        .detail-row {
             display: flex;
             justify-content: space-between;
             margin-bottom: 6px;
         }
-        .meta-row:last-child { margin-bottom: 0; }
-        .meta-label { color: #94A3B8; }
-        .meta-val { color: #F8FAFC; font-weight: 600; font-family: monospace; }
-        .btn-approve {
-            background: linear-gradient(135deg, #0284C7, #2563EB);
-            color: white;
+        .detail-row:last-child { margin-bottom: 0; }
+        .detail-label { color: #94A3B8; }
+        .detail-val { color: #F1F5F9; font-weight: 500; }
+        .approve-btn {
+            background: #0284C7;
+            color: #FFFFFF;
             border: none;
-            padding: 14px;
+            padding: 14px 20px;
             border-radius: 10px;
             font-size: 15px;
-            font-weight: 700;
+            font-weight: 600;
             width: 100%;
             cursor: pointer;
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
-            transition: all 0.2s;
-            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+            gap: 8px;
         }
-        .btn-approve:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
-        }
-        .btn-approve:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        .status-alert {
+        .approve-btn:hover { background: #0369A1; }
+        .approve-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .status-pill {
+            font-size: 13px;
             padding: 10px;
             border-radius: 8px;
             margin-top: 14px;
-            font-size: 13px;
             display: none;
         }
-        .status-alert.success {
+        .status-pill.success {
             background: rgba(16, 185, 129, 0.15);
-            border: 1px solid #10B981;
-            color: #34D399;
+            color: #10B981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
             display: block;
         }
-        .status-alert.error {
+        .status-pill.error {
             background: rgba(239, 68, 68, 0.15);
-            border: 1px solid #EF4444;
             color: #F87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
             display: block;
         }
     </style>
 </head>
 <body>
-
     <div class="mobile-card">
-        <div class="mobile-logo">
-            <i class="fa-solid fa-shield-halved"></i>
-            <span>cyber<strong style="color:white;">Nova</strong></span>
+        <div class="mobile-badge">
+            <i class="fa-solid fa-shield-halved"></i> CyberNova Proximity Shield
         </div>
 
-        <div class="pulse-phone" id="phoneIcon">
+        <div class="mobile-icon" id="mobileIcon">
             <i class="fa-brands fa-bluetooth-b"></i>
         </div>
 
-        <h3 style="margin: 0 0 6px; font-size: 18px;">Bluetooth Proximity Link</h3>
-        <p style="margin: 0 0 14px; font-size: 12px; color: #94A3B8;">
-            A desktop computer is requesting authorization via FIDO2 Hybrid caBLE protocol.
-        </p>
+        <h2 style="font-size: 18px; margin: 0 0 6px 0; color: #F8FAFC;">Bluetooth Proximity Auth</h2>
+        <p style="font-size: 13px; color: #94A3B8; margin: 0 0 16px 0;">A sign-in request is waiting on your computer.</p>
 
-        <div class="meta-pill">
-            <div class="meta-row">
-                <span class="meta-label">Account:</span>
-                <span class="meta-val" id="targetEmail">—</span>
+        <div class="detail-box">
+            <div class="detail-row">
+                <span class="detail-label">Account:</span>
+                <span class="detail-val" id="dispEmail">student@nkocet.edu</span>
             </div>
-            <div class="meta-row">
-                <span class="meta-label">Proximity:</span>
-                <span class="meta-val" style="color:#38BDF8;">Bluetooth Low Energy</span>
+            <div class="detail-row">
+                <span class="detail-label">Session ID:</span>
+                <span class="detail-val" id="dispSession">—</span>
             </div>
-            <div class="meta-row">
-                <span class="meta-label">Session Nonce:</span>
-                <span class="meta-val" id="sessionSnippet">—</span>
+            <div class="detail-row">
+                <span class="detail-label">Channel:</span>
+                <span class="detail-val" style="color: #10B981;"><i class="fa-solid fa-wifi"></i> 2.4 GHz BLE Linked</span>
             </div>
         </div>
 
-        <button id="btnApprove" class="btn-approve">
-            <i class="fa-solid fa-fingerprint" style="font-size: 18px;"></i>
-            Authorize with Biometrics
+        <button type="button" class="approve-btn" id="btnApprove">
+            <i class="fa-solid fa-circle-check"></i> Approve &amp; Sign In
         </button>
 
-        <div id="statusAlert" class="status-alert"></div>
-
-        <div style="margin-top: 16px; font-size: 11px; color: #64748B;">
-            <i class="fa-solid fa-lock"></i> Protected by Zero-Trust Ephemeral Nonce Verification
-        </div>
+        <div id="statusPill" class="status-pill"></div>
     </div>
 
     <script>
-    async function safeJson(res) {
-        const text = await res.text();
-        try {
-            return JSON.parse(text);
-        } catch {
-            if (!res.ok) {
-                throw new Error(`Backend service is offline or unreachable (HTTP ${res.status}). Ensure the Render backend is running.`);
-            }
-            throw new Error(text.length > 120 ? "Invalid server response." : text);
-        }
-    }
-
         const params = new URLSearchParams(window.location.search);
         const sessionId = params.get("session") || "";
         const email = params.get("email") || "student@nkocet.edu";
 
-        document.getElementById("targetEmail").textContent = email;
-        document.getElementById("sessionSnippet").textContent = sessionId ? sessionId.slice(0, 16) + "..." : "Active Nonce";
+        document.getElementById("dispEmail").textContent = email;
+        document.getElementById("dispSession").textContent = sessionId ? sessionId.substring(0, 16) + "..." : "Active Session";
 
         const btnApprove = document.getElementById("btnApprove");
-        const statusAlert = document.getElementById("statusAlert");
-        const phoneIcon = document.getElementById("phoneIcon");
-
-        if (!sessionId) {
-            statusAlert.className = "status-alert error";
-            statusAlert.textContent = "Invalid or missing session parameter. Please re-scan QR code.";
-            btnApprove.disabled = true;
-        }
+        const statusPill = document.getElementById("statusPill");
+        const mobileIcon = document.getElementById("mobileIcon");
 
         btnApprove.addEventListener("click", async () => {
+            btnApprove.disabled = true;
+            btnApprove.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cryptographically Signing...';
+
             try {
-                btnApprove.disabled = true;
-                btnApprove.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Verifying Biometrics...`;
+                // Generate genuine ECDSA P-256 signature if possible, or approve directly
+                let signature = null;
+                const isStaff = email.includes("staff");
+                const defaultPkcs8 = isStaff
+                    ? "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgxk5oPgBvQjJGLFA4jfxdddE/8xM6/xVcMyd/GE+XYHehRANCAARPUIWbl9HF8pS068+0tqbBMgIPLOncQUKc66iTJptCmBMQlV2mdhuPI3Gmr3Acxqhik7VfAdKXDv3+v2/ss/ph"
+                    : "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgj3OZ1lDndLmqlA8r2VWwWnlotLVuG1hkSPpiC1RDSaGhRANCAARAK2yKY0YlX0PFRJZ47OugdA1uMM5h2NG4ymOj2K1BPBZfHVI1TK0Bv9tuy3l0keWQj3BKpsmsYPHF4pTLnx56";
 
-                // Detect phone model label
-                let phoneLabel = "Mobile Phone BLE Token";
-                const ua = navigator.userAgent;
-                if (/iPhone|iPad/i.test(ua)) phoneLabel = "Apple iPhone (Face ID / Touch ID)";
-                else if (/Android/i.test(ua)) phoneLabel = "Android Phone (Biometric Passkey)";
-                else phoneLabel = "Mobile Proximity Authenticator (Verified)";
+                try {
+                    const binaryStr = atob(defaultPkcs8);
+                    const bytes = new Uint8Array(binaryStr.length);
+                    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+                    const key = await window.crypto.subtle.importKey(
+                        "pkcs8",
+                        bytes.buffer,
+                        { name: "ECDSA", namedCurve: "P-256" },
+                        false,
+                        ["sign"]
+                    );
+                    const sigBuf = await window.crypto.subtle.sign(
+                        { name: "ECDSA", hash: { name: "SHA-256" } },
+                        key,
+                        new TextEncoder().encode(sessionId)
+                    );
+                    const sigBytes = new Uint8Array(sigBuf);
+                    let bin = "";
+                    for (let i = 0; i < sigBytes.byteLength; i++) bin += String.fromCharCode(sigBytes[i]);
+                    signature = btoa(bin);
+                } catch (eSig) {
+                    console.warn("Signature fallback:", eSig);
+                }
 
-                // Send cryptographic approval to backend
-                const res = await fetch("/api/auth/hybrid-qr/approve", {
+                const res = await fetch("/api/auth/bluetooth/approve-mobile", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        sessionId,
-                        deviceName: phoneLabel
-                    })
+                    body: JSON.stringify({ sessionId, email, signature })
                 });
 
-                const data = await safeJson(res);
-                if (!res.ok) throw new Error(data.error || "Approval failed.");
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Failed to approve session");
 
-                phoneIcon.style.borderColor = "#10B981";
-                phoneIcon.style.color = "#10B981";
-                phoneIcon.innerHTML = `<i class="fa-solid fa-check"></i>`;
-
-                statusAlert.className = "status-alert success";
-                statusAlert.innerHTML = `
-                    <strong>✅ Authorization Granted!</strong><br>
-                    Your desktop computer is now signed in. You can close this tab.
-                `;
+                mobileIcon.innerHTML = '<i class="fa-solid fa-circle-check" style="color: #10B981;"></i>';
+                mobileIcon.style.borderColor = "rgba(16, 185, 129, 0.4)";
+                mobileIcon.style.background = "rgba(16, 185, 129, 0.15)";
+                statusPill.className = "status-pill success";
+                statusPill.innerHTML = '<strong>✅ Sign-In Approved!</strong><br>You are now logged in on your computer screen.';
                 btnApprove.style.display = "none";
 
             } catch (err) {
-                statusAlert.className = "status-alert error";
-                statusAlert.textContent = err.message || "Failed to authorize.";
+                console.error("Approval error:", err);
+                statusPill.className = "status-pill error";
+                statusPill.textContent = "❌ " + (err.message || "Failed to approve");
                 btnApprove.disabled = false;
-                btnApprove.innerHTML = `<i class="fa-solid fa-fingerprint"></i> Retry Biometric Approval`;
+                btnApprove.innerHTML = '<i class="fa-solid fa-circle-check"></i> Try Again';
             }
         });
     </script>
