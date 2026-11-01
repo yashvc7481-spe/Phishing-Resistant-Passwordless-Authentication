@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberNova — Student Academic Portal &amp; Passkey Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="dashboard-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <i class="fa-solid fa-shield-halved logo-icon"></i>
+                cyber<span>Nova</span>
+            </div>
+            <div class="sidebar-sub">Student Academic Portal</div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="sidebar-section-label">Main</div>
+            <a href="#" class="sidebar-link active">
+                <i class="fa-solid fa-graduation-cap"></i> Courses &amp; Grades
+            </a>
+            <a href="#passkeysSection" class="sidebar-link">
+                <i class="fa-solid fa-key"></i> Registered Passkeys
+            </a>
+            <a href="#activitySection" class="sidebar-link">
+                <i class="fa-solid fa-clock-rotate-left"></i> Security Activity
+            </a>
+            <a href="#recoverySection" class="sidebar-link">
+                <i class="fa-solid fa-life-ring"></i> Account Recovery
+            </a>
+
+            <div class="sidebar-section-label">Navigation</div>
+            <a href="index.html" class="sidebar-link">
+                <i class="fa-solid fa-house"></i> Home
+            </a>
+            <a href="phishing-demo.html" class="sidebar-link">
+                <i class="fa-solid fa-fish-fins"></i> Phishing Lab
+            </a>
+            <a href="staff-login.html" class="sidebar-link">
+                <i class="fa-solid fa-building-columns"></i> Staff Portal
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="sidebar-avatar">
+                    <i class="fa-solid fa-user-graduate"></i>
+                </div>
+                <div>
+                    <div class="sidebar-user-name" id="sidebarName">Loading...</div>
+                    <div class="sidebar-user-role">Student · FIDO2 Verified</div>
+                </div>
+            </div>
+            <button id="logoutBtn" class="btn btn-secondary btn-full btn-sm" style="margin-top: 12px; gap: 6px;">
+                <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="top-bar">
+            <span class="top-bar-title">Student Portal</span>
+            <div class="top-bar-right">
+                <span class="auth-pill green" id="userDisplayName">
+                    <i class="fa-solid fa-user-graduate"></i> Loading...
+                </span>
+                <button id="logoutBtnTop" class="btn btn-ghost btn-sm" style="color: var(--critical);" title="Sign Out">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="content-area">
+            <!-- Welcome Banner -->
+            <div class="welcome-banner">
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <h1 style="font-size: 18px; font-weight: 700; margin-bottom: 4px;">Student Academic Portal</h1>
+                        <p style="font-size: 13px; color: var(--text-secondary);">Session authenticated with a phishing-resistant FIDO2 passkey. No password was used.</p>
+                    </div>
+                    <div class="security-badge">
+                        <i class="fa-solid fa-check-double"></i> Biometric Verified · Zero Password
+                    </div>
+                </div>
+            </div>
+
+            <div class="dash-grid">
+                <!-- Enrolled Courses -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">
+                            <i class="fa-solid fa-book-open"></i>
+                            Enrolled Courses
+                        </span>
+                        <span class="badge badge-blue" style="font-size: 10px;">Academic Record</span>
+                    </div>
+                    <div class="panel-body" style="padding: 0;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Course</th>
+                                    <th>Credits</th>
+                                    <th>Grade</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="color: var(--text-primary); font-weight: 500;">Cryptography &amp; Network Security</td>
+                                    <td>4</td>
+                                    <td class="grade-cell">A+</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: var(--text-primary); font-weight: 500;">Advanced Cloud Architectures</td>
+                                    <td>3</td>
+                                    <td class="grade-cell">A</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: var(--text-primary); font-weight: 500;">Cybersecurity &amp; Threat Mitigation</td>
+                                    <td>4</td>
+                                    <td class="grade-cell">A+</td>
+                                </tr>
+                                <tr>
+                                    <td style="color: var(--text-primary); font-weight: 500;">Operating Systems Security</td>
+                                    <td>3</td>
+                                    <td class="grade-cell">A</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Passkey Devices (Feature 3) -->
+                <div class="panel" id="passkeysSection">
+                    <div class="panel-header">
+                        <span class="panel-title">
+                            <i class="fa-solid fa-key"></i>
+                            Registered Passkey Devices
+                        </span>
+                        <button id="btnEnrollNewDevice" class="btn btn-secondary btn-sm" style="font-size: 11px;">
+                            <i class="fa-solid fa-plus-circle"></i> Add Passkey
+                        </button>
+                    </div>
+                    <div class="panel-body">
+                        <div id="credentialsList" class="credentials-list">
+                            <div style="font-size: 13px; color: var(--text-muted); padding: 8px 0;">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading registered devices...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trusted Bluetooth Authenticators -->
+                <div class="panel" id="bluetoothDevicesSection" style="margin-top: 20px;">
+                    <div class="panel-header">
+                        <span class="panel-title">
+                            <i class="fa-brands fa-bluetooth-b" style="color: #38BDF8;"></i>
+                            Trusted Bluetooth Authenticators
+                        </span>
+                        <button id="btnPairNewBluetooth" class="btn btn-secondary btn-sm" style="font-size: 11px; background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.3); color: #38BDF8;">
+                            <i class="fa-solid fa-satellite-dish"></i> Pair Authenticator
+                        </button>
+                    </div>
+                    <div class="panel-body">
+                        <!-- In-Dashboard Scanner Box -->
+                        <div id="btPairingScannerBox" class="hidden" style="margin-bottom: 14px; padding: 14px; background: var(--bg-primary); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: var(--radius);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="pulse-dot"></span>
+                                    <strong style="color: #38BDF8; font-size: 13px;">Web Bluetooth Discovery Scanner</strong>
+                                </div>
+                                <button type="button" id="btnCloseBtScanner" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px;">&times; Close</button>
+                            </div>
+                            <div id="btPairScannerStatus" style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+                                Ready to discover nearby 2.4GHz BLE hardware tokens and proximity authenticators...
+                            </div>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button type="button" id="btnStartBleScan" class="btn btn-primary btn-sm" style="background: #0284C7; font-size: 12px;">
+                                    <i class="fa-brands fa-bluetooth-b"></i> Scan Nearby Peripherals
+                                </button>
+                                <button type="button" id="btnPairDemoBle" class="btn btn-secondary btn-sm" style="font-size: 12px;">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Pair Demo BLE Token
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="bluetoothList" class="credentials-list">
+                            <div style="font-size: 13px; color: var(--text-muted); padding: 8px 0;">
+                                <i class="fa-solid fa-spinner fa-spin"></i> Loading trusted Bluetooth devices...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Personal Security Activity (Feature 6) -->
+            <div class="panel" id="activitySection" style="margin-top: 20px;">
+                <div class="panel-header">
+                    <span class="panel-title">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        Recent Account Security Activity
+                    </span>
+                    <span class="badge badge-blue" style="font-size: 10px;">Personal Audit Feed</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Event</th>
+                                <th>IP Address</th>
+                                <th>Risk Level</th>
+                                <th>Details</th>
+                                <th>Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userActivityBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                                    <i class="fa-solid fa-spinner fa-spin"></i> Loading personal activity...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Account Recovery & Single-Use Codes (Feature 7) -->
+            <div class="panel" id="recoverySection" style="margin-top: 20px;">
+                <div class="panel-header">
+                    <span class="panel-title">
+                        <i class="fa-solid fa-life-ring"></i>
+                        Emergency Passwordless Account Recovery
+                    </span>
+                    <button id="btnGenerateRecoveryCodes" class="btn btn-secondary btn-sm" style="font-size: 11px;">
+                        <i class="fa-solid fa-key"></i> Generate Fresh Recovery Codes
+                    </button>
+                </div>
+                <div class="panel-body">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+                                Single-Use Disaster Recovery Protection
+                            </div>
+                            <div style="font-size: 13px; color: var(--text-secondary);">
+                                Active unconsumed recovery codes on file: <strong id="recoveryCodesCount" style="color: var(--accent-cyan);">—</strong>.
+                                If you lose your biometric device, a single-use code allows you to recover your account and enroll a new passkey.
+                            </div>
+                        </div>
+                        <a href="account-recovery.html" class="btn btn-secondary btn-sm">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Test Recovery Portal
+                        </a>
+                    </div>
+
+                    <!-- Recovery Codes Display Box -->
+                    <div id="newRecoveryCodesBox" class="hidden" style="margin-top: 16px; padding: 14px; background: var(--bg-tertiary); border: 1px solid rgba(59,130,246,0.3); border-radius: var(--radius);">
+                        <div style="font-size: 12px; font-weight: 700; color: #60A5FA; margin-bottom: 8px;">
+                            <i class="fa-solid fa-shield-cat"></i> NEW SINGLE-USE RECOVERY CODES GENERATED:
+                        </div>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+                            Store these in a safe place. Each code can be used exactly once. They are cryptographically hashed and cannot be viewed again.
+                        </p>
+                        <div id="recoveryCodesGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; font-family: var(--font-mono); font-size: 12px; color: var(--text-code);"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auth Telemetry -->
+            <div class="panel" style="margin-top: 20px; margin-bottom: 20px;">
+                <div class="panel-header">
+                    <span class="panel-title">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        Session Authentication Details
+                    </span>
+                </div>
+                <div class="panel-body">
+                    <div class="auth-info-grid">
+                        <div class="auth-info-row">
+                            <span class="auth-info-label">Protocol</span>
+                            <span class="auth-info-value blue">FIDO2 / WebAuthn</span>
+                        </div>
+                        <div class="auth-info-row">
+                            <span class="auth-info-label">User Verification</span>
+                            <span class="auth-info-value green">Present (Biometric)</span>
+                        </div>
+                        <div class="auth-info-row">
+                            <span class="auth-info-label">Algorithm</span>
+                            <span class="auth-info-value blue">ES256 / RS256</span>
+                        </div>
+                        <div class="auth-info-row">
+                            <span class="auth-info-label">Phishing Resistant</span>
+                            <span class="auth-info-value green">Yes — Domain Bound</span>
+                        </div>
+                        <div class="auth-info-row">
+                            <span class="auth-info-label">Session Type</span>
+                            <span class="auth-info-value blue">HTTP-Only JWT Cookie</span>
+                        </div>
+                        <div class="auth-info-row">
+                            <span class="auth-info-label">Session Expiry</span>
+                            <span class="auth-info-value blue">4 hours</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Biometric Privacy Explainer -->
+            <div class="privacy-box">
+                <h4>
+                    <i class="fa-solid fa-shield-heart"></i>
+                    How Your Biometric Privacy is Protected
+                </h4>
+                <p>
+                    Your raw biometric data — fingerprint scan or Face ID geometry — <strong style="color: var(--text-primary);">never leaves your device</strong>.
+                    The biometric scanner unlocks the private key inside your device's hardware Secure Enclave.
+                    Only an asymmetric cryptographic signature is transmitted to the CyberNova server.
+                    The server holds only your public key and verifies the signature — it cannot reconstruct your biometric.
+                </p>
+            </div>
+
+            <!-- Hidden Honeytoken (preserved) -->
+            <a href="/api/admin/export-system-keys" style="display:none;" id="admin-export">Export System Keys</a>
+        </div>
+    </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script type="module">
+    import { startRegistration } from "https://esm.sh/@simplewebauthn/browser@14.0.0";
+
+    let currentUserEmail = "";
+
+    async function loadDashboard() {
+        try {
+            const res = await fetch("/api/me");
+            if (!res.ok) {
+                window.location.href = "student-login.html";
+                return;
+            }
+            const data = await res.json();
+            currentUserEmail = data.user.email;
+
+            const name = data.user.displayName || data.user.email;
+            document.getElementById("userDisplayName").innerHTML =
+                `<i class="fa-solid fa-user-graduate"></i> ${name}`;
+            document.getElementById("sidebarName").textContent = name;
+
+            if (document.getElementById("recoveryCodesCount")) {
+                document.getElementById("recoveryCodesCount").textContent = `${data.activeRecoveryCodesCount} unused codes`;
+            }
+
+            renderCredentialsList(data.credentials);
+            renderBluetoothList(data.bluetoothDevices);
+            loadUserActivity();
+        } catch (err) {
+            window.location.href = "student-login.html";
+        }
+    }
+
+    function renderCredentialsList(credentials = []) {
+        const list = document.getElementById("credentialsList");
+        if (!credentials || credentials.length === 0) {
+            list.innerHTML = `
+                <div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">
+                    <i class="fa-solid fa-key" style="display:block; font-size: 24px; margin-bottom: 8px; opacity:0.4;"></i>
+                    No biometric passkeys registered yet.
+                </div>`;
+            return;
+        }
+
+        list.innerHTML = credentials.map(c => `
+            <div class="cred-item" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <strong><i class="fa-solid fa-fingerprint" style="color: var(--accent-blue);"></i> ${c.device_name}</strong>
+                        <span class="badge ${c.status === 'active' ? 'badge-green' : 'badge-red'}" style="font-size: 10px;">
+                            ${c.status === 'active' ? 'Active' : 'Revoked'}
+                        </span>
+                    </div>
+                    <div class="cred-meta" style="margin-top: 4px;">
+                        Counter: <code>${c.counter}</code>
+                        &nbsp;·&nbsp; Enrolled: ${new Date(c.created_at).toLocaleDateString()}
+                        &nbsp;·&nbsp; Last Active: ${c.last_used ? new Date(c.last_used).toLocaleTimeString() : 'Recent'}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 6px;">
+                    <button onclick="window.renameDevice('${c.credential_id}', '${c.device_name}')" class="btn btn-secondary btn-sm" title="Rename Passkey" style="padding: 6px 10px; font-size: 11px;">
+                        <i class="fa-solid fa-pen"></i> Rename
+                    </button>
+                    ${c.status === 'active' ? `
+                        <button onclick="window.revokePasskey('${c.credential_id}')" class="btn btn-secondary btn-sm" title="Revoke Passkey" style="padding: 6px 10px; font-size: 11px; color: var(--critical); border-color: rgba(239,68,68,0.3);">
+                            <i class="fa-solid fa-ban"></i> Revoke
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `).join("");
+    }
+
+    function renderBluetoothList(bluetoothDevices = []) {
+        const list = document.getElementById("bluetoothList");
+        if (!bluetoothDevices || bluetoothDevices.length === 0) {
+            list.innerHTML = `
+                <div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">
+                    <i class="fa-brands fa-bluetooth-b" style="display:block; font-size: 24px; margin-bottom: 8px; opacity:0.4;"></i>
+                    No trusted Bluetooth authenticators paired yet. Click <strong>'Pair Authenticator'</strong> above to scan.
+                </div>`;
+            return;
+        }
+
+        list.innerHTML = bluetoothDevices.map(b => `
+            <div class="cred-item" style="border-left: 3px solid ${b.status === 'active' ? '#0284C7' : 'var(--critical)'}; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <strong><i class="fa-brands fa-bluetooth-b" style="color: #38BDF8;"></i> ${b.device_name}</strong>
+                        <span class="badge ${b.status === 'active' ? 'badge-blue' : 'badge-red'}" style="font-size: 10px;">
+                            ${b.status === 'active' ? 'Active / Trusted' : 'Revoked'}
+                        </span>
+                    </div>
+                    <div class="cred-meta" style="margin-top: 4px;">
+                        Type: <code>Web Bluetooth GATT</code>
+                        &nbsp;·&nbsp; ID: <code>${(b.device_identifier || '').substring(0, 18)}...</code>
+                        &nbsp;·&nbsp; Last Proximity: ${b.last_used ? new Date(b.last_used).toLocaleTimeString() : 'Enrolled'}
+                    </div>
+                </div>
+                <div style="display: flex; gap: 6px;">
+                    <button onclick="window.renameBluetooth(${b.id}, '${b.device_name.replace(/'/g, "\\'")}')" class="btn btn-secondary btn-sm" title="Rename Bluetooth Authenticator" style="padding: 6px 10px; font-size: 11px;">
+                        <i class="fa-solid fa-pen"></i> Rename
+                    </button>
+                    ${b.status === 'active' ? `
+                        <button onclick="window.revokeBluetooth(${b.id}, '${b.device_name.replace(/'/g, "\\'")}')" class="btn btn-secondary btn-sm" title="Revoke Bluetooth Authenticator" style="padding: 6px 10px; font-size: 11px; color: var(--critical); border-color: rgba(239,68,68,0.3);">
+                            <i class="fa-solid fa-ban"></i> Revoke
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `).join("");
+    }
+
+    async function loadUserActivity() {
+        const tbody = document.getElementById("userActivityBody");
+        try {
+            const res = await fetch("/api/user/audit-logs");
+            const data = await res.json();
+            if (!data.logs || data.logs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">No security events recorded for this account yet.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = data.logs.map(log => {
+                let parsedDetails = log.details;
+                try {
+                    const obj = JSON.parse(log.details);
+                    parsedDetails = Object.entries(obj).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(" · ");
+                } catch(e) {}
+
+                const riskBadge = log.risk_level === 'HIGH' ? 'badge-red' : (log.risk_level === 'MEDIUM' ? 'badge-amber' : 'badge-green');
+
+                return `
+                    <tr>
+                        <td style="font-weight: 600; font-family: var(--font-mono); font-size: 12px;">${log.event_type}</td>
+                        <td style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">${log.ip_address}</td>
+                        <td><span class="badge ${riskBadge}" style="font-size: 10px;">${log.risk_level || 'LOW'} (${log.risk_score || 0})</span></td>
+                        <td style="font-size: 12px; color: var(--text-secondary); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${parsedDetails}">${parsedDetails}</td>
+                        <td style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">${new Date(log.timestamp).toLocaleTimeString()}</td>
+                    </tr>
+                `;
+            }).join("");
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="5" style="color: var(--critical); text-align: center;">Could not load activity records.</td></tr>`;
+        }
+    }
+
+    // Passkey Management Handlers
+    window.renameDevice = async function(credId, currentName) {
+        const newName = prompt("Enter a new nickname for this passkey device:", currentName);
+        if (!newName || !newName.trim() || newName.trim() === currentName) return;
+
+        try {
+            const res = await fetch(`/api/credentials/${credId}/rename`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ deviceName: newName.trim() })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to rename.");
+            loadDashboard();
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    window.revokePasskey = async function(credId) {
+        if (!confirm("Are you sure you want to revoke this passkey? It will immediately lose access and cannot authenticate again.")) return;
+
+        try {
+            const res = await fetch(`/api/credentials/${credId}/revoke`, { method: "POST" });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to revoke passkey.");
+            loadDashboard();
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    // Enroll New Device directly from dashboard
+    document.getElementById("btnEnrollNewDevice").addEventListener("click", async () => {
+        if (!currentUserEmail) return;
+        try {
+            const res = await fetch("/api/register/options", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: currentUserEmail })
+            });
+            const options = await res.json();
+            if (!res.ok) throw new Error(options.error || "Failed to initialize registration.");
+
+            const credential = await startRegistration({ optionsJSON: options });
+            const deviceName = prompt("Enter a label for this new device passkey:", "Secondary Security Token") || "Passkey Authenticator";
+
+            const verifyRes = await fetch("/api/register/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: currentUserEmail, response: credential, deviceName })
+            });
+            const result = await verifyRes.json();
+            if (!verifyRes.ok) throw new Error(result.error || "Registration failed.");
+
+            alert("✅ New passkey device enrolled successfully!");
+            loadDashboard();
+            alert("Enrollment failed: " + err.message);
+        }
+    });
+
+    // Bluetooth Management Handlers
+    window.renameBluetooth = async function(devId, currentName) {
+        const newName = prompt("Enter a new nickname for this Bluetooth authenticator:", currentName);
+        if (!newName || !newName.trim() || newName.trim() === currentName) return;
+
+        try {
+            const res = await fetch(`/api/bluetooth/devices/${devId}/rename`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ deviceName: newName.trim() })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to rename.");
+            loadDashboard();
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    window.revokeBluetooth = async function(devId, devName) {
+        if (!confirm(`Are you sure you want to revoke '${devName}'? This Bluetooth token will be immediately blocked from authenticating.`)) return;
+
+        try {
+            const res = await fetch(`/api/bluetooth/devices/${devId}/revoke`, { method: "POST" });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to revoke Bluetooth device.");
+            loadDashboard();
+        } catch (err) {
+            alert(err.message);
+        }
+    };
+
+    // Bluetooth Dashboard Scanner Controls
+    const btnPairNewBluetooth = document.getElementById("btnPairNewBluetooth");
+    const btPairingScannerBox = document.getElementById("btPairingScannerBox");
+    const btnCloseBtScanner = document.getElementById("btnCloseBtScanner");
+    const btnStartBleScan = document.getElementById("btnStartBleScan");
+    const btnPairDemoBle = document.getElementById("btnPairDemoBle");
+    const btPairScannerStatus = document.getElementById("btPairScannerStatus");
+
+    btnPairNewBluetooth?.addEventListener("click", () => {
+        btPairingScannerBox?.classList.toggle("hidden");
+    });
+
+    btnCloseBtScanner?.addEventListener("click", () => {
+        btPairingScannerBox?.classList.add("hidden");
+    });
+
+    btnStartBleScan?.addEventListener("click", async () => {
+        if (!navigator.bluetooth) {
+            alert("Web Bluetooth API is not supported in this browser (Google Chrome, Microsoft Edge, or Opera required). You can click 'Pair Demo BLE Token' instead.");
+            return;
+        }
+
+        try {
+            if (btPairScannerStatus) btPairScannerStatus.innerHTML = "<i class='fa-brands fa-bluetooth-b fa-spin' style='color:#38BDF8;'></i> Scanning for discoverable Bluetooth devices...";
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ["generic_access", "device_information", "battery_service"]
+            });
+
+            if (btPairScannerStatus) btPairScannerStatus.innerHTML = `<i class='fa-solid fa-spinner fa-spin'></i> Enrolling <strong>${device.name || "BLE Authenticator"}</strong> to account...`;
+
+            const res = await fetch("/api/bluetooth/pair", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    deviceName: device.name || "Bluetooth Authenticator",
+                    deviceIdentifier: device.id
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to pair device.");
+
+            alert("✅ " + data.message);
+            btPairingScannerBox?.classList.add("hidden");
+            loadDashboard();
+        } catch (err) {
+            if (err.name === "NotFoundError") {
+                if (btPairScannerStatus) btPairScannerStatus.textContent = "Bluetooth pairing was canceled.";
+            } else {
+                alert("Pairing Error: " + err.message);
+            }
+        }
+    });
+
+    btnPairDemoBle?.addEventListener("click", async () => {
+        try {
+            const devName = prompt("Enter a label for this demo Bluetooth hardware token:", "YubiKey 5C BLE Token") || "Demo BLE Authenticator";
+            const res = await fetch("/api/bluetooth/pair", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    deviceName: devName,
+                    deviceIdentifier: "BLE-VIRTUAL-" + Math.floor(1000 + Math.random() * 9000)
+                })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to pair demo device.");
+
+            alert("✅ " + data.message);
+            btPairingScannerBox?.classList.add("hidden");
+            loadDashboard();
+        } catch (err) {
+            alert(err.message);
+        }
+    });
+
+    // Generate Recovery Codes
+    document.getElementById("btnGenerateRecoveryCodes").addEventListener("click", async () => {
+        if (!confirm("Generating new recovery codes will invalidate any existing recovery codes. Continue?")) return;
+        try {
+            const res = await fetch("/api/recovery/generate", { method: "POST" });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to generate codes.");
+
+            const box = document.getElementById("newRecoveryCodesBox");
+            const grid = document.getElementById("recoveryCodesGrid");
+            grid.innerHTML = data.codes.map((c, i) => `
+                <div style="background: var(--bg-primary); padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                    <span style="color: var(--text-muted); font-size: 10px;">CODE ${i+1}:</span><br>
+                    <strong>${c}</strong>
+                </div>
+            `).join("");
+            box.classList.remove("hidden");
+            loadDashboard();
+        } catch (e) {
+            alert(e.message);
+        }
+    });
+
+    function logout() {
+        fetch("/api/logout", { method: "POST" }).then(() => {
+            window.location.href = "index.html";
+        });
+    }
+
+    document.getElementById("logoutBtn").addEventListener("click", logout);
+    document.getElementById("logoutBtnTop").addEventListener("click", logout);
+
+    loadDashboard();
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: cybernova-backend
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: RP_NAME
+        value: cyberNova Enterprise Portal
+      - key: COOKIE_SAMESITE
+        value: none
+      # Optional: To persist database across deployments on Render Starter plan,
+      # attach a Render disk mounted at /data and uncomment the following:
+      # - key: DATABASE_PATH
+      #   value: /data/cybernova.db
+    # disk:
+    #   name: cybernova-data
+    #   mountPath: /data
+    #   sizeGB: 1

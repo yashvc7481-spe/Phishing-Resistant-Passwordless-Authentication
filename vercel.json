@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "outputDirectory": ".",
+  "rewrites": [
+    {
+      "source": "/api/:match*",
+      "destination": "https://cybernova-backend.onrender.com/api/:match*"
+    }
+  ]
+}

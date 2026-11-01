@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberNova — Phishing-Resistant Passwordless Authentication</title>
+    <meta name="description" content="CyberNova combines FIDO2 passwordless authentication, phishing awareness training, and security monitoring to protect organizations from credential attacks.">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="site-nav">
+        <div class="logo">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            cyber<span>Nova</span>
+        </div>
+        <div class="nav-actions">
+            <a href="phishing-demo.html" class="nav-link danger">
+                <i class="fa-solid fa-bug"></i> Phishing Lab
+            </a>
+            <a href="account-recovery.html" class="nav-link">
+                <i class="fa-solid fa-life-ring"></i> Recovery
+            </a>
+            <a href="student-login.html" class="nav-link">
+                <i class="fa-solid fa-graduation-cap"></i> Student Portal
+            </a>
+            <a href="staff-login.html" class="nav-btn">
+                <i class="fa-solid fa-building-columns"></i> Staff Login
+            </a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <!-- Left -->
+        <div class="hero-left">
+            <div class="hero-eyebrow">
+                <i class="fa-solid fa-fingerprint"></i>
+                Fingerprint Biometrics · Web Bluetooth Proximity Fallback
+            </div>
+
+            <h1 class="hero-title">
+                Secure Every Login.<br>
+                <span class="accent">Fingerprint &amp; Bluetooth Auth.</span>
+            </h1>
+
+            <p class="hero-desc">
+                CyberNova combines hardware-enforced biometric authentication, Web Bluetooth proximity challenge fallback, and live SOC monitoring to eliminate credential phishing.
+            </p>
+
+            <div class="hero-actions">
+                <a href="student-login.html" class="btn btn-primary btn-lg">
+                    <i class="fa-solid fa-fingerprint"></i> Student Portal Login
+                </a>
+                <a href="staff-login.html" class="btn btn-secondary btn-lg">
+                    <i class="fa-solid fa-building-columns"></i> Staff SOC Portal
+                </a>
+            </div>
+
+            <div class="hero-meta">
+                <div class="hero-meta-item">
+                    <i class="fa-solid fa-circle-check"></i>
+                    No passwords stored
+                </div>
+                <div class="hero-meta-item">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Biometrics stay on device
+                </div>
+                <div class="hero-meta-item">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Domain-bound keys
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Interface Preview -->
+        <div class="hero-right">
+            <div class="interface-preview">
+                <div class="preview-topbar">
+                    <div class="preview-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <div class="preview-url">
+                        <i class="fa-solid fa-lock"></i>
+                        localhost:3000
+                    </div>
+                    <div class="preview-status">
+                        <span class="preview-status-dot"></span>
+                        <span class="preview-status-label">FIDO2 Active</span>
+                    </div>
+                </div>
+
+                <div class="preview-body">
+                    <!-- Auth Status -->
+                    <div class="preview-auth-row success-row">
+                        <div class="preview-auth-label">
+                            <i class="fa-solid fa-fingerprint"></i>
+                            Biometric Verification
+                        </div>
+                        <div class="preview-auth-value">TOUCH ID / PASSKEY</div>
+                    </div>
+
+                    <div class="preview-auth-row">
+                        <div class="preview-auth-label">
+                            <i class="fa-brands fa-bluetooth-b" style="color: #38BDF8;"></i>
+                            Bluetooth Fallback
+                        </div>
+                        <div class="preview-auth-value blue">BLE GATT · PROXIMITY READY</div>
+                    </div>
+
+                    <div class="preview-auth-row">
+                        <div class="preview-auth-label">
+                            <i class="fa-solid fa-shield-halved"></i>
+                            Phishing Risk
+                        </div>
+                        <div class="preview-auth-value">NONE · BOUND</div>
+                    </div>
+
+                    <!-- Recent Events -->
+                    <div>
+                        <div class="preview-events-header">Recent Security Events</div>
+                        <div class="preview-event">
+                            <span class="preview-event-dot green"></span>
+                            <span class="preview-event-text">LOGIN_SUCCESS · student@nkocet.edu</span>
+                            <span class="preview-event-time">09:41</span>
+                        </div>
+                        <div class="preview-event">
+                            <span class="preview-event-dot red"></span>
+                            <span class="preview-event-text">PHISHING_ATTACK_BLOCKED · origin mismatch</span>
+                            <span class="preview-event-time">09:38</span>
+                        </div>
+                        <div class="preview-event">
+                            <span class="preview-event-dot blue"></span>
+                            <span class="preview-event-text">PASSKEY_REGISTERED · Biometric Auth</span>
+                            <span class="preview-event-time">09:22</span>
+                        </div>
+                        <div class="preview-event">
+                            <span class="preview-event-dot amber"></span>
+                            <span class="preview-event-text">HONEYTOKEN_TRIGGERED · crawler IP</span>
+                            <span class="preview-event-time">09:15</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section">
+        <div class="section-header">
+            <div class="section-label">Platform Capabilities</div>
+            <h2 class="section-title">Everything you need to eliminate credential risk</h2>
+            <p class="section-desc">A complete authentication and threat-awareness platform built on open FIDO2 standards.</p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-item">
+                <div class="feature-icon blue">
+                    <i class="fa-solid fa-key"></i>
+                </div>
+                <div class="feature-name">FIDO2 / WebAuthn Passkeys</div>
+                <div class="feature-desc">Asymmetric key pairs stored in the device's secure enclave. No passwords ever transmitted or stored.</div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-icon red">
+                    <i class="fa-solid fa-fish-fins"></i>
+                </div>
+                <div class="feature-name">Phishing-Resistant by Design</div>
+                <div class="feature-desc">Credentials are cryptographically bound to the registered origin. Attackers cannot replay signatures across domains.</div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-icon cyan">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                </div>
+                <div class="feature-name">Proximity Token (caBLE)</div>
+                <div class="feature-desc">FIDO2 Hybrid transport lets users authenticate using a Bluetooth-paired phone as a roaming hardware key.</div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-icon green">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <div class="feature-name">Biometric Privacy</div>
+                <div class="feature-desc">Touch ID, Face ID, and Windows Hello biometrics never leave the device. Only digital signatures reach the server.</div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-icon amber">
+                    <i class="fa-solid fa-radar"></i>
+                </div>
+                <div class="feature-name">SOC Audit Stream</div>
+                <div class="feature-desc">Every authentication event, phishing block, and honeypot trigger is logged to a live security operations feed.</div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-icon purple">
+                    <i class="fa-solid fa-spider"></i>
+                </div>
+                <div class="feature-name">Honey-Token Active Defense</div>
+                <div class="feature-desc">Decoy endpoints log and fingerprint attackers that attempt to access non-existent system key exports.</div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-icon blue">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <div class="feature-name">Student & Staff Portals</div>
+                <div class="feature-desc">Role-separated access flows with distinct authentication policies for academic and administrative users.</div>
+            </div>
+
+            <div class="feature-item">
+                <div class="feature-icon cyan">
+                    <i class="fa-solid fa-shield-virus"></i>
+                </div>
+                <div class="feature-name">Phishing Simulation Lab</div>
+                <div class="feature-desc">Demonstrate live phishing attacks against password systems and cryptographic defense via passkeys — side by side.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Portals Section -->
+    <section class="portals-section">
+        <div class="section-label">Access Portals</div>
+        <h2 class="section-title">Select your portal</h2>
+        <p class="section-desc" style="margin-top: 6px; margin-bottom: 0;">Both portals require a registered FIDO2 passkey. No password is used at any step.</p>
+
+        <div class="portal-grid">
+            <div class="portal-card">
+                <div class="portal-card-header">
+                    <div class="portal-card-icon blue">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                    </div>
+                    <span class="badge badge-blue">Academic</span>
+                </div>
+                <h3>Student Portal</h3>
+                <p>Access enrolled courses, grades, and your registered passkey devices. Authenticate with Touch ID, Windows Hello, or a paired mobile device.</p>
+                <a href="student-login.html" class="portal-card-link">
+                    Sign in as Student <i class="fa-solid fa-arrow-right"></i>
+                </a>
+            </div>
+
+            <div class="portal-card staff">
+                <div class="portal-card-header">
+                    <div class="portal-card-icon purple">
+                        <i class="fa-solid fa-building-columns"></i>
+                    </div>
+                    <span class="badge badge-purple">Administrative</span>
+                </div>
+                <h3>Staff &amp; Faculty Portal</h3>
+                <p>Access the live SOC telemetry dashboard, security event logs, passkey enrollment stats, and honeypot intrusion alerts.</p>
+                <a href="staff-login.html" class="portal-card-link">
+                    Sign in as Staff <i class="fa-solid fa-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <span>cyberNova Enterprise Defense System &nbsp;·&nbsp; FIDO2 / WebAuthn &nbsp;·&nbsp; NKOCET Competition Edition</span>
+    </footer>
+
+    <div id="toast-container"></div>
+</body>
+</html>

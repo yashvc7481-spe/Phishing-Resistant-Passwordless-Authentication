@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberNova — Phishing Simulation Lab</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .scenario-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            margin-bottom: 4px;
+        }
+        .scenario-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .attack-card-body { padding: 20px; }
+        .attack-card-body > p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            line-height: 1.65;
+        }
+        .sim-step {
+            display: flex;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 13px;
+        }
+        .sim-step:last-child { border-bottom: none; }
+        .sim-step-num {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .sim-step-text { color: var(--text-secondary); }
+        .sim-step-text strong { color: var(--text-primary); }
+        .why-box {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 14px 16px;
+            margin-top: 16px;
+        }
+        .why-box-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            margin-bottom: 6px;
+        }
+        .why-box p { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+    </style>
+</head>
+<body>
+<div class="dashboard-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo" style="font-size: 15px;">
+                <i class="fa-solid fa-shield-halved logo-icon"></i>
+                cyber<span>Nova</span>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav" style="padding-top: 20px;">
+            <div class="sidebar-section-label">Simulation Lab</div>
+            <a href="#" class="sidebar-link active">
+                <i class="fa-solid fa-fish-fins"></i> Phishing Scenarios
+            </a>
+            <a href="#" class="sidebar-link">
+                <i class="fa-solid fa-spider"></i> Honeypot Demo
+            </a>
+
+            <div class="sidebar-section-label">Navigation</div>
+            <a href="index.html" class="sidebar-link">
+                <i class="fa-solid fa-house"></i> Home
+            </a>
+            <a href="student-login.html" class="sidebar-link">
+                <i class="fa-solid fa-graduation-cap"></i> Student Portal
+            </a>
+            <a href="staff-login.html" class="sidebar-link">
+                <i class="fa-solid fa-building-columns"></i> Staff Portal
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main -->
+    <div class="main-content">
+        <div class="top-bar">
+            <span class="top-bar-title">Phishing Simulation Lab</span>
+            <div class="top-bar-right">
+                <span class="badge badge-amber" style="font-size: 11px;">
+                    <i class="fa-solid fa-flask"></i> SIMULATION MODE — No real attacks
+                </span>
+                <a href="index.html" class="btn btn-ghost btn-sm" style="gap: 6px;">
+                    <i class="fa-solid fa-arrow-left"></i> Exit Lab
+                </a>
+            </div>
+        </div>
+
+        <div class="content-area">
+
+            <!-- Lab Header -->
+            <div class="sim-header-banner" style="margin-bottom: 20px;">
+                <div class="sim-header-left">
+                    <h2>Credential Phishing: Attack &amp; Defense</h2>
+                    <p>This lab demonstrates why traditional passwords are vulnerable to phishing, and how FIDO2 passkeys are immune by design. No real attacks are performed.</p>
+                </div>
+                <div class="sim-mode-label">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    Educational Simulation
+                </div>
+            </div>
+
+            <!-- Attack Grid -->
+            <div class="attack-grid">
+
+                <!-- Scenario A: Password Phishing (Vulnerable) -->
+                <div class="attack-card failure-card">
+                    <div class="attack-card-header">
+                        <div>
+                            <div class="scenario-label">Scenario A</div>
+                            <div class="scenario-title">Legacy Password System</div>
+                        </div>
+                        <span class="badge badge-red">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Vulnerable
+                        </span>
+                    </div>
+                    <div class="attack-card-body">
+                        <p>
+                            An attacker clones the college login portal on
+                            <code>http://fake-college-portal.xyz</code> and sends phishing emails.
+                            When the victim enters their password, it is intercepted in transit.
+                        </p>
+
+                        <div style="margin-bottom: 16px;">
+                            <div class="sim-step">
+                                <span class="sim-step-num">1</span>
+                                <div class="sim-step-text">Attacker clones login page at a lookalike domain</div>
+                            </div>
+                            <div class="sim-step">
+                                <span class="sim-step-num">2</span>
+                                <div class="sim-step-text">Victim receives phishing email, clicks the link</div>
+                            </div>
+                            <div class="sim-step">
+                                <span class="sim-step-num">3</span>
+                                <div class="sim-step-text"><strong>Victim types password → attacker intercepts it</strong></div>
+                            </div>
+                        </div>
+
+                        <div class="sim-input-box">
+                            <label>Victim's password (simulation input):</label>
+                            <input type="password" id="simPassword" value="SecretPassword123!" placeholder="Type any password">
+                            <button onclick="simulatePasswordTheft()" class="sim-btn red-btn btn">
+                                <i class="fa-solid fa-play"></i> Simulate Form Submission
+                            </button>
+                        </div>
+
+                        <div id="passwordResult" class="sim-terminal hidden">
+                            <span class="term-red">[BREACH SIMULATED]</span> Attacker's proxy intercepted the form data:<br>
+                            <strong>Captured:</strong> <span id="capturedPwd"></span><br>
+                            <strong>Attack result:</strong> Account compromised. MFA can be bypassed via session hijack.
+                        </div>
+
+                        <div class="why-box">
+                            <div class="why-box-label">Why this works</div>
+                            <p>Passwords are reusable secrets. A copied login page is indistinguishable from the real one. The victim's credential works on <em>any</em> server that receives it.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scenario B: Passkey Defense -->
+                <div class="attack-card success-card">
+                    <div class="attack-card-header">
+                        <div>
+                            <div class="scenario-label">Scenario B</div>
+                            <div class="scenario-title">CyberNova Passkey System</div>
+                        </div>
+                        <span class="badge badge-green">
+                            <i class="fa-solid fa-shield-check"></i> Phishing-Resistant
+                        </span>
+                    </div>
+                    <div class="attack-card-body">
+                        <p>
+                            The same phishing site targets a CyberNova user. The victim attempts
+                            to authenticate, but the FIDO2 authenticator refuses to sign the
+                            challenge because the domain does not match.
+                        </p>
+
+                        <div style="margin-bottom: 16px;">
+                            <div class="sim-step">
+                                <span class="sim-step-num">1</span>
+                                <div class="sim-step-text">Victim visits <code>fake-college-portal.xyz</code> via phishing link</div>
+                            </div>
+                            <div class="sim-step">
+                                <span class="sim-step-num">2</span>
+                                <div class="sim-step-text"><strong>Authenticator hashes the real origin (RP ID)</strong> — it does not match the registered domain</div>
+                            </div>
+                            <div class="sim-step">
+                                <span class="sim-step-num">3</span>
+                                <div class="sim-step-text">Private key <strong>refuses to sign</strong> → server logs attack → no credential leaked</div>
+                            </div>
+                        </div>
+
+                        <div class="sim-input-box">
+                            <label>Target account (simulation):</label>
+                            <input type="email" id="simPasskeyEmail" value="student@nkocet.edu" placeholder="student@nkocet.edu">
+                            <button onclick="simulatePasskeyDefense()" class="sim-btn blue-btn btn">
+                                <i class="fa-solid fa-play"></i> Simulate Passkey on Phishing Domain
+                            </button>
+                        </div>
+
+                        <div id="passkeyResult" class="sim-terminal hidden">
+                            <span class="term-green">[CRYPTOGRAPHIC DEFENSE ENGAGED]</span><br>
+                            <strong>Browser origin check:</strong> <code>http://fake-college-portal.xyz</code> ≠ <code>localhost</code> (RP_ID)<br>
+                            <strong>FIDO2 mechanism:</strong> The authenticator signs with SHA-256(RP_ID). The rogue domain produces a different hash — the private key refuses to generate a valid assertion.<br>
+                            <strong>Server defense:</strong> Origin mismatch detected. Phishing block logged to SOC.
+                        </div>
+
+                        <div class="why-box">
+                            <div class="why-box-label">Why this fails for the attacker</div>
+                            <p>Passkeys are domain-bound. The private key never leaves the device and only produces a valid signature for the exact registered origin. A copied login page on a different domain receives nothing usable.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Honeypot Section -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">
+                        <i class="fa-solid fa-spider"></i>
+                        Honey-Token Active Defense Demonstration
+                    </span>
+                </div>
+                <div class="panel-body">
+                    <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.65; max-width: 700px;">
+                        CyberNova embeds a decoy endpoint <code>/api/admin/export-system-keys</code> — a honeypot that looks like a leaked admin key export.
+                        Automated scanners, curious attackers, and crawlers who probe this URL are silently fingerprinted and logged to the SOC audit stream.
+                        No real keys exist at this endpoint.
+                    </p>
+
+                    <button onclick="triggerHoneypot()" class="btn btn-secondary" style="gap: 8px; margin-bottom: 16px;">
+                        <i class="fa-solid fa-spider"></i> Trigger Honey-Token Alarm
+                    </button>
+
+                    <div id="honeyResult" class="sim-terminal hidden"></div>
+
+                    <div class="why-box" style="margin-top: 16px;">
+                        <div class="why-box-label">What happens</div>
+                        <p>
+                            The request is intercepted, the attacker's IP and headers are recorded, the event is logged as <strong style="color: var(--critical);">CRITICAL</strong> in the SOC stream, and a 403 is returned.
+                            No real credentials are exposed. Visit the <a href="staff-login.html" style="color: var(--accent-blue);">Staff SOC Dashboard</a> to see the event appear in real time.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+    function simulatePasswordTheft() {
+        const pwd = document.getElementById("simPassword").value;
+        document.getElementById("capturedPwd").textContent = pwd;
+        document.getElementById("passwordResult").classList.remove("hidden");
+    }
+
+    async function simulatePasskeyDefense() {
+        const email = document.getElementById("simPasskeyEmail").value;
+        try {
+            // This sends a flagged request to the backend which logs it as a phishing block
+            await fetch("/api/login/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email,
+                    isPhishingSimulation: true,
+                    simulatedOrigin: "http://fake-college-portal.xyz"
+                })
+            });
+            document.getElementById("passkeyResult").classList.remove("hidden");
+        } catch (e) {
+            document.getElementById("passkeyResult").classList.remove("hidden");
+        }
+    }
+
+    async function triggerHoneypot() {
+        try {
+            const res = await fetch("/api/admin/export-system-keys");
+            const data = await res.json();
+            const box = document.getElementById("honeyResult");
+            box.classList.remove("hidden");
+            box.innerHTML = `<span class="term-red">[HONEYTOKEN TRIPPED]</span> Server responded with HTTP 403 Forbidden<br><strong>Status:</strong> ${data.error}<br><em style="color: var(--text-muted);">Intrusion event logged as CRITICAL in Staff SOC Dashboard.</em>`;
+        } catch (e) {
+            const box = document.getElementById("honeyResult");
+            box.classList.remove("hidden");
+            box.innerHTML = `<span class="term-red">[HONEYTOKEN TRIPPED]</span> Request sent and logged. Check the Staff SOC Dashboard for the HONEYTOKEN_TRIGGERED event.`;
+        }
+    }
+</script>
+</body>
+</html>

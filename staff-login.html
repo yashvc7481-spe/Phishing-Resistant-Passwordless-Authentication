@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberNova — Staff &amp; Faculty Portal Login (Fingerprint &amp; Bluetooth)</title>
+    <meta name="description" content="Sign in to the CyberNova staff administrative portal using Fingerprint Biometric Authentication with Bluetooth Proximity Fallback.">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="login-page-body staff-theme">
+
+    <!-- Left: Branding Panel -->
+    <div class="login-branding" style="border-right-color: rgba(139,92,246,0.3);">
+        <div class="logo">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            cyber<span>Nova</span>
+        </div>
+
+        <div class="login-brand-content">
+            <div class="login-brand-badge" style="border-color: rgba(139,92,246,0.3); color: #A78BFA; background: rgba(139,92,246,0.1);">
+                <i class="fa-solid fa-building-columns"></i>
+                Staff &amp; Faculty Portal
+            </div>
+            <h2 class="login-brand-title">
+                Hardware-grade<br>biometric security.
+            </h2>
+            <p class="login-brand-desc">
+                High-assurance administrative gateway to the SOC dashboard. Supports WebAuthn platform fingerprint sensors, FIDO2 security keys, and Web Bluetooth proximity tokens.
+            </p>
+            <div class="login-brand-points">
+                <div class="login-brand-point">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Hardware-enforced biometric user verification
+                </div>
+                <div class="login-brand-point">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Automated device capability detection
+                </div>
+                <div class="login-brand-point">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Web Bluetooth GATT proximity challenge fallback
+                </div>
+                <div class="login-brand-point">
+                    <i class="fa-solid fa-circle-check"></i>
+                    All administrative sign-ins audited to SOC stream
+                </div>
+            </div>
+        </div>
+
+        <div class="login-brand-footer">
+            FIDO2 / WebAuthn · Web Bluetooth API · ES256 · Audit Monitored
+        </div>
+    </div>
+
+    <!-- Right: Form Panel -->
+    <div class="login-form-panel">
+        <div class="login-form-inner" style="max-width: 440px;">
+            <a href="index.html" class="login-back">
+                <i class="fa-solid fa-arrow-left"></i> Back to home
+            </a>
+
+            <div class="login-header">
+                <div class="logo" style="margin-bottom: 12px; font-size: 16px;">
+                    <i class="fa-solid fa-shield-halved logo-icon"></i>
+                    cyber<span>Nova</span>
+                </div>
+                <span class="badge badge-purple login-portal-tag" style="color: #A78BFA; background: rgba(139,92,246,0.15); border-color: rgba(139,92,246,0.25);">
+                    <i class="fa-solid fa-building-columns"></i> Faculty / Staff Portal
+                </span>
+                <p class="login-subtitle" style="margin-top: 6px;">Administrative Biometric &amp; Proximity Gateway</p>
+            </div>
+
+            <!-- Real-time Device Capability Bar -->
+            <div id="capabilityBar" class="device-capability-bar">
+                <div class="capability-pill">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                    <span>Detecting hardware authenticators...</span>
+                </div>
+            </div>
+
+            <!-- Email Identity Input -->
+            <div class="input-group" style="margin-bottom: 16px;">
+                <label for="username">
+                    <i class="fa-solid fa-envelope"></i> Faculty / Staff Email
+                </label>
+                <input
+                    type="email"
+                    id="username"
+                    placeholder="staff@nkocet.edu"
+                    value="staff@nkocet.edu"
+                    autocomplete="username webauthn"
+                    required
+                >
+            </div>
+
+            <!-- Authentication Mode Selector Tabs -->
+            <div class="auth-mode-tabs" role="tablist">
+                <button type="button" id="tabBiometric" class="auth-tab-btn active" role="tab">
+                    <i class="fa-solid fa-fingerprint"></i> Fingerprint
+                </button>
+                <button type="button" id="tabBluetooth" class="auth-tab-btn" role="tab">
+                    <i class="fa-brands fa-bluetooth-b"></i> Bluetooth
+                </button>
+                <button type="button" id="tabFallback" class="auth-tab-btn" role="tab">
+                    <i class="fa-solid fa-key"></i> Fallback
+                </button>
+            </div>
+
+            <!-- Status Messages Box -->
+            <div id="statusMessage" class="status-box hidden" style="margin-bottom: 16px;"></div>
+
+            <!-- PANEL 1: Fingerprint Biometric Authentication -->
+            <div id="panelBiometric" class="auth-panel">
+                <div class="biometric-scanner-box">
+                    <div class="laser-scan-line"></div>
+                    <div class="fingerprint-radar-rings">
+                        <div class="scanner-ring ring-1"></div>
+                        <div class="scanner-ring ring-2"></div>
+                        <div class="scanner-ring ring-3"></div>
+                        <i class="fa-solid fa-fingerprint fingerprint-icon-glyph"></i>
+                    </div>
+                    <div class="biometric-state-text">Administrative Biometric Sensor</div>
+                    <div class="biometric-state-subtext">Touch ID · Windows Hello · Hardware Security Key</div>
+                </div>
+
+                <button type="button" id="passkeyLogin" class="passkey-btn staff-btn">
+                    <i class="fa-solid fa-fingerprint"></i>
+                    Sign In with Fingerprint
+                </button>
+
+                <button type="button" id="switchBluetoothLink" class="auth-mode-switch-link">
+                    <i class="fa-brands fa-bluetooth-b"></i> Sensor unavailable? Authenticate via Bluetooth &rarr;
+                </button>
+
+                <div class="login-divider">first time on this terminal?</div>
+
+                <div class="register-box">
+                    <p>Enrolling a new administrative device or hardware token?</p>
+                    <button type="button" id="registerPasskey" class="btn btn-secondary btn-full">
+                        <i class="fa-solid fa-plus-circle"></i> Enroll Administrative Biometrics
+                    </button>
+                </div>
+
+                <div class="auth-notice-card info">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <strong>Hardware Enclave Security:</strong> Administrative WebAuthn sessions require user verification. WebAuthn availability indicates platform support; your device may prompt for Touch ID, facial recognition, or system PIN. Raw biometric templates never leave your local hardware enclave.
+                </div>
+            </div>
+
+            <!-- PANEL 2: Bluetooth Proximity Authentication (FIDO2 Hybrid caBLE / QR Code) -->
+            <div id="panelBluetooth" class="auth-panel hidden">
+                
+                <!-- QR Code Proximity Authenticator -->
+                <div class="bt-qr-auth-container" id="btQrAuthBox">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <span style="font-weight: 700; font-size: 13px; color: #A78BFA;">
+                            <i class="fa-solid fa-qrcode"></i> Administrative Bluetooth QR Proximity Link
+                        </span>
+                        <span class="badge badge-purple" style="font-size: 10px;">FIDO2 caBLE</span>
+                    </div>
+
+                    <div class="qr-code-frame" id="qrCodeFrame">
+                        <div id="qrCodeSpinner" style="text-align: center; color: var(--text-muted); padding: 30px 10px;">
+                            <i class="fa-solid fa-spinner fa-spin" style="font-size: 32px; color: #A78BFA; margin-bottom: 10px;"></i>
+                            <div style="font-size: 12px;">Generating Ephemeral Nonce QR Code...</div>
+                        </div>
+                        <img id="btQrImage" src="" alt="Bluetooth Pairing QR Code" class="hidden" style="width: 200px; height: 200px; border-radius: 8px; margin: 0 auto; background: white; padding: 6px; box-shadow: 0 4px 15px rgba(0,0,0,0.4);">
+                    </div>
+
+                    <div class="bt-status-pill" style="justify-content: center; margin: 10px 0 6px;">
+                        <span class="bt-pulse-indicator connected" id="qrPulseIndicator"></span>
+                        <span id="qrStatusText" style="font-size: 11px; font-weight: 600; color: #F8FAFC;">Awaiting Phone Camera Scan...</span>
+                    </div>
+
+                    <p style="font-size: 11px; color: var(--text-muted); text-align: center; margin: 0 0 14px; line-height: 1.4;">
+                        Scan with your smartphone camera to establish a secure Bluetooth proximity channel and authorize admin access.
+                    </p>
+
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                        <button type="button" id="btnInstantApprove" class="passkey-btn staff-btn" style="flex: 2; margin: 0; font-size: 13px;">
+                            <i class="fa-solid fa-bolt"></i> Instant Biometric Approve
+                        </button>
+                        <button type="button" id="btnOpenMobileTab" class="btn btn-secondary" title="Open mobile view in new tab" style="flex: 1; padding: 10px; font-size: 12px;">
+                            <i class="fa-solid fa-mobile-screen"></i> Phone View
+                        </button>
+                    </div>
+
+                    <div style="text-align: center; margin-top: 6px;">
+                        <button type="button" id="btnToggleBleRawScan" style="background: none; border: none; color: var(--text-muted); font-size: 11px; cursor: pointer; text-decoration: underline;">
+                            <i class="fa-brands fa-bluetooth-b"></i> Have a physical BLE hardware token? Toggle Browser Dialog &rarr;
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Raw BLE Scanner Section (collapsible) -->
+                <div id="btRawScannerSection" class="hidden">
+                    <div class="bluetooth-radar-box" id="btRadarBox">
+                        <div class="bluetooth-radar-rings">
+                            <div class="bt-radar-ring bt-ring-1"></div>
+                            <div class="bt-radar-ring bt-ring-2"></div>
+                            <i class="fa-brands fa-bluetooth-b bluetooth-icon-glyph"></i>
+                        </div>
+                        <div class="biometric-state-text" id="btRadarTitle">Administrative Bluetooth Proximity</div>
+                        <div class="biometric-state-subtext" id="btRadarSubtitle">BLE GATT Proximity &middot; Cryptographic Challenge</div>
+                    </div>
+
+                    <div class="bt-scanner-status-bar" id="btScannerStatusBar">
+                        <div class="bt-status-pill">
+                            <span class="bt-pulse-indicator" id="btPulseIndicator"></span>
+                            <span id="btStatusLabel">Scanner Ready · Discoverable BLE Mode</span>
+                        </div>
+                        <span class="badge badge-purple" style="font-size: 10px;" id="btRangeLabel">2.4 GHz Band</span>
+                    </div>
+
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px;" id="btActionButtonsRow">
+                        <button type="button" id="btConnectBtn" class="passkey-btn staff-btn" style="flex: 2; margin: 0;">
+                            <i class="fa-brands fa-bluetooth-b"></i>
+                            Scan Nearby BLE Devices
+                        </button>
+                        <button type="button" id="btDemoBtn" class="btn btn-secondary" title="Use virtual hardware token for quick testing" style="flex: 1; padding: 10px; font-size: 12px;">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Demo Token
+                        </button>
+                    </div>
+
+                    <!-- Connected Device & Challenge Card -->
+                    <div id="btConnectedCard" class="bt-connected-card hidden">
+                        <div class="bt-connected-header">
+                            <div class="bt-device-name" id="btDeviceName">
+                                <i class="fa-brands fa-bluetooth-b" style="color: #A78BFA;"></i> Paired BLE Device
+                            </div>
+                            <div class="bt-status-live">
+                                <span class="pulse-dot"></span> Active GATT Link
+                            </div>
+                        </div>
+                        <div class="bt-device-meta" id="btDeviceMeta" style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px;">
+                            Device Identifier: <code id="btDeviceIdPreview">—</code>
+                        </div>
+                        <div class="bt-challenge-preview" id="btChallengeDisplay">
+                            Awaiting server challenge...
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <button type="button" id="btVerifyBtn" class="passkey-btn staff-btn" style="flex: 1; margin: 0; font-size: 13px;">
+                                <i class="fa-solid fa-circle-check"></i> Verify Proximity &amp; Sign In
+                            </button>
+                            <button type="button" id="btDisconnectBtn" class="btn btn-secondary" style="padding: 10px 14px;" title="Disconnect Bluetooth Authenticator">
+                                <i class="fa-solid fa-link-slash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" id="switchBiometricLink" class="auth-mode-switch-link">
+                    <i class="fa-solid fa-fingerprint"></i> Have a fingerprint sensor? Switch back to Fingerprint &rarr;
+                </button>
+
+                <div class="auth-notice-card warning" style="margin-top: 14px;">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <strong>Anti-Spoofing Protocol:</strong> Bluetooth proximity is cryptographically verified via single-use nonces and mutual authentication.
+                </div>
+            </div>
+
+            <!-- PANEL 3: Security Key / Emergency Fallback -->
+            <div id="panelFallback" class="auth-panel hidden">
+                <div class="auth-notice-card info" style="margin-top: 0; margin-bottom: 14px;">
+                    <i class="fa-solid fa-shield-cat"></i>
+                    <strong>Administrative Backup:</strong> When biometric sensors and Bluetooth are unavailable, sign in using an authorized high-assurance emergency security passcode.
+                </div>
+
+                <div class="input-group">
+                    <label for="fallbackCode">
+                        <i class="fa-solid fa-key"></i> Emergency Administrative Passcode
+                    </label>
+                    <input
+                        type="text"
+                        id="fallbackCode"
+                        placeholder="e.g. CN-SECURE-STF-4482"
+                        autocomplete="off"
+                        style="font-family: var(--font-mono); letter-spacing: 1px;"
+                    >
+                </div>
+
+                <div style="display: flex; gap: 8px; margin-top: 6px;">
+                    <button type="button" id="fallbackVerifyBtn" class="passkey-btn staff-btn" style="flex: 1; margin: 0;">
+                        <i class="fa-solid fa-lock-open"></i> Verify Administrative Passcode
+                    </button>
+                    <button type="button" id="fetchDemoCodeBtn" class="btn btn-secondary" title="Load registered test passcode" style="padding: 10px 14px; font-size: 12px;">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Test Key
+                    </button>
+                <div class="login-divider" style="margin-top: 20px;">lost your device?</div>
+                <a href="account-recovery.html" class="auth-mode-switch-link" style="color: #F87171;">
+                    <i class="fa-solid fa-life-ring"></i> Lost access to administrative passkeys? Recover Account &rarr;
+                </a>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Authentication Engine -->
+    <script type="module">
+        import { CyberNovaAuth } from "./auth-flow.js";
+        const auth = new CyberNovaAuth({ role: "staff", defaultEmail: "staff@nkocet.edu" });
+        auth.init();
+    </script>
+</body>
+</html>

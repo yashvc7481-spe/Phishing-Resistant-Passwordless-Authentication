@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberNova — Secure Passwordless Account Recovery</title>
+    <meta name="description" content="Recover your CyberNova account using cryptographic single-use recovery codes, revoke lost credentials, and enroll replacement passkeys.">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .recovery-step-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 100px;
+            background: rgba(239, 68, 68, 0.1);
+            color: #F87171;
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            margin-bottom: 12px;
+        }
+        .recovery-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .step-num {
+            display: inline-flex;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            color: #fff;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+            margin-right: 8px;
+        }
+        .step-title {
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body class="login-page-body">
+
+    <!-- Left: Branding Panel -->
+    <div class="login-branding">
+        <div class="logo">
+            <i class="fa-solid fa-shield-halved logo-icon"></i>
+            cyber<span>Nova</span>
+        </div>
+
+        <div class="login-brand-content">
+            <div class="recovery-step-badge">
+                <i class="fa-solid fa-life-ring"></i>
+                Passwordless Disaster Recovery
+            </div>
+            <h2 class="login-brand-title">
+                Lost your device or<br>biometric token?
+            </h2>
+            <p class="login-brand-desc">
+                CyberNova provides zero-trust recovery using single-use cryptographic recovery codes. No master passwords, no administrative bypasses.
+            </p>
+            <div class="login-brand-points">
+                <div class="login-brand-point">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Salted SHA-256 recovery code verification
+                </div>
+                <div class="login-brand-point">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Immediate single-use code invalidation
+                </div>
+                <div class="login-brand-point">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Instantly revoke compromised credentials
+                </div>
+                <div class="login-brand-point">
+                    <i class="fa-solid fa-circle-check"></i>
+                    Enroll new replacement passkeys on the spot
+                </div>
+            </div>
+        </div>
+
+        <div class="login-brand-footer">
+            RFC 6238 / FIDO2 Standards · Salted SHA-256 · Audit Logged
+        </div>
+    </div>
+
+    <!-- Right: Recovery Wizard Panel -->
+    <div class="login-form-panel">
+        <div class="login-form-inner" style="max-width: 480px;">
+            <a href="student-login.html" class="login-back">
+                <i class="fa-solid fa-arrow-left"></i> Back to login
+            </a>
+
+            <div class="login-header">
+                <div class="logo" style="margin-bottom: 12px; font-size: 16px;">
+                    <i class="fa-solid fa-shield-halved logo-icon"></i>
+                    cyber<span>Nova</span>
+                </div>
+                <span class="badge badge-amber login-portal-tag">
+                    <i class="fa-solid fa-key"></i> Account Recovery
+                </span>
+                <p class="login-subtitle" style="margin-top: 6px;">Zero-Trust Passwordless Credential Replacement</p>
+            </div>
+
+            <!-- Status Box -->
+            <div id="statusMessage" class="status-box hidden" style="margin-bottom: 16px;"></div>
+
+            <!-- STEP 1: Verify Identity via Single-Use Recovery Code -->
+            <div id="recoveryStep1" class="recovery-card">
+                <div class="step-title">
+                    <span class="step-num">1</span> Verify Recovery Code
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+                    Enter your college email address and one of your unused emergency recovery codes.
+                </p>
+
+                <div class="input-group">
+                    <label for="recoveryEmail"><i class="fa-solid fa-envelope"></i> Account Email</label>
+                    <input type="email" id="recoveryEmail" value="student@nkocet.edu" placeholder="student@nkocet.edu" required>
+                </div>
+
+                <div class="input-group">
+                    <label for="recoveryCode"><i class="fa-solid fa-ticket"></i> Single-Use Recovery Code</label>
+                    <input type="text" id="recoveryCode" placeholder="e.g. CN-RECOV-9921-STU1" style="font-family: var(--font-mono); letter-spacing: 1px;" required>
+                </div>
+
+                <div style="display: flex; gap: 8px; margin-top: 14px;">
+                    <button type="button" id="btnVerifyRecovery" class="passkey-btn" style="flex: 1; margin: 0;">
+                        <i class="fa-solid fa-unlock-keyhole"></i> Verify Recovery Code
+                    </button>
+                    <button type="button" id="btnLoadDemoRecovery" class="btn btn-secondary" title="Load registered demo test recovery key">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Test Key
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 2: Manage Existing Credentials & Enroll Replacement -->
+            <div id="recoveryStep2" class="recovery-card hidden">
+                <div class="step-title">
+                    <span class="step-num">2</span> Revoke Lost Credentials
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Identity verified via recovery code. Revoke lost hardware tokens to block unauthorized access.
+                </p>
+
+                <div id="recoveryCredsList" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+                    <div style="font-size: 12px; color: var(--text-muted);">Loading enrolled credentials...</div>
+                </div>
+
+                <div class="step-title" style="margin-top: 20px;">
+                    <span class="step-num">3</span> Enroll Replacement Passkey
+                </div>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+                    Register your new device's biometric sensor (Touch ID, Windows Hello) as your new active passkey.
+                </p>
+
+                <button type="button" id="btnEnrollReplacement" class="btn btn-primary btn-full" style="margin-bottom: 12px;">
+                    <i class="fa-solid fa-fingerprint"></i> Enroll Replacement Passkey on This Device
+                </button>
+
+                <button type="button" id="btnProceedDashboard" class="btn btn-secondary btn-full">
+                    <i class="fa-solid fa-arrow-right"></i> Proceed to Student Dashboard
+                </button>
+            </div>
+
+            <div class="auth-notice-card warning">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <strong>Security Policy:</strong> Single-use recovery codes are consumed immediately upon verification. Once used, a code cannot be reused. New recovery codes can be generated from your security dashboard.
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { startRegistration } from "https://esm.sh/@simplewebauthn/browser@14.0.0";
+
+        const statusBox = document.getElementById("statusMessage");
+        const step1 = document.getElementById("recoveryStep1");
+        const step2 = document.getElementById("recoveryStep2");
+        const credsList = document.getElementById("recoveryCredsList");
+
+        function showStatus(html, type = "info") {
+            statusBox.className = `status-box ${type}`;
+            statusBox.innerHTML = html;
+            statusBox.classList.remove("hidden");
+        }
+
+        // Demo key helper
+        document.getElementById("btnLoadDemoRecovery").addEventListener("click", async () => {
+            const email = document.getElementById("recoveryEmail").value.trim().toLowerCase();
+            try {
+                const res = await fetch(`/api/recovery/demo-code?email=${encodeURIComponent(email)}`);
+                const data = await res.json();
+                if (data.code) {
+                    document.getElementById("recoveryCode").value = data.code;
+                    showStatus(`ℹ️ Loaded active demo recovery key: <code>${data.code}</code>. Click <strong>Verify Recovery Code</strong>.`, "info");
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        });
+
+        // Step 1: Verify Recovery Code
+        document.getElementById("btnVerifyRecovery").addEventListener("click", async () => {
+            const email = document.getElementById("recoveryEmail").value.trim().toLowerCase();
+            const recoveryCode = document.getElementById("recoveryCode").value.trim().toUpperCase();
+
+            if (!email || !recoveryCode) {
+                showStatus("⚠️ Please enter your email and recovery code.", "error");
+                return;
+            }
+
+            try {
+                showStatus("<i class='fa-solid fa-spinner fa-spin'></i> Cryptographically validating recovery hash...", "info");
+                const res = await fetch("/api/recovery/verify", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, recoveryCode })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Recovery code verification failed.");
+
+                showStatus("✅ <strong>Identity Verified!</strong> Recovery code accepted. Please review your credentials below.", "success");
+                step1.classList.add("hidden");
+                step2.classList.remove("hidden");
+                loadUserCredentials();
+            } catch (err) {
+                showStatus(`❌ ${err.message}`, "error");
+            }
+        });
+
+        // Load credentials for revocation
+        async function loadUserCredentials() {
+            try {
+                const res = await fetch("/api/credentials");
+                const data = await res.json();
+                if (!res.ok) throw new Error("Could not load credentials.");
+
+                if (data.credentials.length === 0) {
+                    credsList.innerHTML = `<div style="font-size: 13px; color: var(--text-muted);">No passkeys currently on file.</div>`;
+                    return;
+                }
+
+                credsList.innerHTML = data.credentials.map(c => `
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: var(--radius-sm);">
+                        <div>
+                            <div style="font-size: 13px; font-weight: 700; color: var(--text-primary);">${c.device_name}</div>
+                            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+                                Status: <span style="color: ${c.status === 'active' ? '#4ADE80' : '#F87171'};">${c.status.toUpperCase()}</span> · Enrolled ${new Date(c.created_at).toLocaleDateString()}
+                            </div>
+                        </div>
+                        ${c.status === 'active' ? `
+                            <button onclick="revokeCred('${c.credential_id}')" class="btn btn-secondary btn-sm" style="color: #F87171; border-color: rgba(239,68,68,0.3); font-size: 11px;">
+                                <i class="fa-solid fa-ban"></i> Revoke
+                            </button>
+                        ` : `
+                            <span class="badge badge-red" style="font-size: 10px;">Revoked</span>
+                        `}
+                    </div>
+                `).join("");
+            } catch (e) {
+                credsList.innerHTML = `<div style="color: var(--critical); font-size: 12px;">Failed to load credentials.</div>`;
+            }
+        }
+
+        window.revokeCred = async function(id) {
+            if (!confirm("Are you sure you want to revoke this passkey? It will immediately lose authentication access.")) return;
+            try {
+                const res = await fetch(`/api/credentials/${id}/revoke`, { method: "POST" });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Failed to revoke.");
+                showStatus("✅ Credential revoked successfully.", "success");
+                loadUserCredentials();
+            } catch (err) {
+                showStatus(`❌ ${err.message}`, "error");
+            }
+        };
+
+        // Enroll Replacement Passkey
+        document.getElementById("btnEnrollReplacement").addEventListener("click", async () => {
+            const email = document.getElementById("recoveryEmail").value.trim().toLowerCase();
+            try {
+                showStatus("<i class='fa-solid fa-spinner fa-spin'></i> Initializing replacement passkey enrollment...", "info");
+                const res = await fetch("/api/register/options", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email })
+                });
+                const options = await res.json();
+                if (!res.ok) throw new Error(options.error || "Failed to initialize registration.");
+
+                showStatus("<i class='fa-solid fa-fingerprint'></i> Touch biometric sensor to register replacement passkey...", "info");
+                const credential = await startRegistration({ optionsJSON: options });
+
+                const deviceName = prompt("Enter a label for this replacement passkey:", "Replacement Biometric Passkey") || "Replacement Authenticator";
+
+                const verifyRes = await fetch("/api/register/verify", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, response: credential, deviceName })
+                });
+                const result = await verifyRes.json();
+                if (!verifyRes.ok) throw new Error(result.error || "Registration failed.");
+
+                showStatus("✅ <strong>Replacement Passkey Enrolled!</strong> You can now sign in with this new passkey.", "success");
+                loadUserCredentials();
+            } catch (err) {
+                showStatus(`❌ ${err.message}`, "error");
+            }
+        });
+
+        document.getElementById("btnProceedDashboard").addEventListener("click", () => {
+            window.location.href = "student-dashboard.html";
+        });
+    </script>
+</body>
+</html>

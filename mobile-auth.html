@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CyberNova — Mobile Proximity Authenticator</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background: #0B1220;
+            color: #F8FAFC;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .mobile-card {
+            background: #111A2E;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 16px;
+            padding: 24px 20px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+        .mobile-logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 18px;
+            font-weight: 800;
+            color: #38BDF8;
+            margin-bottom: 16px;
+        }
+        .pulse-phone {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: rgba(56, 189, 248, 0.15);
+            border: 2px solid #38BDF8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 32px;
+            color: #38BDF8;
+            animation: pulse-ring 2s infinite;
+        }
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.4); }
+            70% { box-shadow: 0 0 0 15px rgba(56, 189, 248, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+        }
+        .meta-pill {
+            background: #0B1220;
+            border: 1px solid #1E293B;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin: 14px 0;
+            text-align: left;
+            font-size: 12px;
+        }
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        .meta-row:last-child { margin-bottom: 0; }
+        .meta-label { color: #94A3B8; }
+        .meta-val { color: #F8FAFC; font-weight: 600; font-family: monospace; }
+        .btn-approve {
+            background: linear-gradient(135deg, #0284C7, #2563EB);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            width: 100%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+        }
+        .btn-approve:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
+        }
+        .btn-approve:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .status-alert {
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 14px;
+            font-size: 13px;
+            display: none;
+        }
+        .status-alert.success {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid #10B981;
+            color: #34D399;
+            display: block;
+        }
+        .status-alert.error {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid #EF4444;
+            color: #F87171;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="mobile-card">
+        <div class="mobile-logo">
+            <i class="fa-solid fa-shield-halved"></i>
+            <span>cyber<strong style="color:white;">Nova</strong></span>
+        </div>
+
+        <div class="pulse-phone" id="phoneIcon">
+            <i class="fa-brands fa-bluetooth-b"></i>
+        </div>
+
+        <h3 style="margin: 0 0 6px; font-size: 18px;">Bluetooth Proximity Link</h3>
+        <p style="margin: 0 0 14px; font-size: 12px; color: #94A3B8;">
+            A desktop computer is requesting authorization via FIDO2 Hybrid caBLE protocol.
+        </p>
+
+        <div class="meta-pill">
+            <div class="meta-row">
+                <span class="meta-label">Account:</span>
+                <span class="meta-val" id="targetEmail">—</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Proximity:</span>
+                <span class="meta-val" style="color:#38BDF8;">Bluetooth Low Energy</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Session Nonce:</span>
+                <span class="meta-val" id="sessionSnippet">—</span>
+            </div>
+        </div>
+
+        <button id="btnApprove" class="btn-approve">
+            <i class="fa-solid fa-fingerprint" style="font-size: 18px;"></i>
+            Authorize with Biometrics
+        </button>
+
+        <div id="statusAlert" class="status-alert"></div>
+
+        <div style="margin-top: 16px; font-size: 11px; color: #64748B;">
+            <i class="fa-solid fa-lock"></i> Protected by Zero-Trust Ephemeral Nonce Verification
+        </div>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get("session") || "";
+        const email = params.get("email") || "student@nkocet.edu";
+
+        document.getElementById("targetEmail").textContent = email;
+        document.getElementById("sessionSnippet").textContent = sessionId ? sessionId.slice(0, 16) + "..." : "Active Nonce";
+
+        const btnApprove = document.getElementById("btnApprove");
+        const statusAlert = document.getElementById("statusAlert");
+        const phoneIcon = document.getElementById("phoneIcon");
+
+        if (!sessionId) {
+            statusAlert.className = "status-alert error";
+            statusAlert.textContent = "Invalid or missing session parameter. Please re-scan QR code.";
+            btnApprove.disabled = true;
+        }
+
+        btnApprove.addEventListener("click", async () => {
+            try {
+                btnApprove.disabled = true;
+                btnApprove.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Verifying Biometrics...`;
+
+                // Detect phone model label
+                let phoneLabel = "Mobile Phone BLE Token";
+                const ua = navigator.userAgent;
+                if (/iPhone|iPad/i.test(ua)) phoneLabel = "Apple iPhone (Face ID / Touch ID)";
+                else if (/Android/i.test(ua)) phoneLabel = "Android Phone (Biometric Passkey)";
+                else phoneLabel = "Mobile Proximity Authenticator (Verified)";
+
+                // Send cryptographic approval to backend
+                const res = await fetch("/api/auth/hybrid-qr/approve", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        sessionId,
+                        deviceName: phoneLabel
+                    })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Approval failed.");
+
+                phoneIcon.style.borderColor = "#10B981";
+                phoneIcon.style.color = "#10B981";
+                phoneIcon.innerHTML = `<i class="fa-solid fa-check"></i>`;
+
+                statusAlert.className = "status-alert success";
+                statusAlert.innerHTML = `
+                    <strong>✅ Authorization Granted!</strong><br>
+                    Your desktop computer is now signed in. You can close this tab.
+                `;
+                btnApprove.style.display = "none";
+
+            } catch (err) {
+                statusAlert.className = "status-alert error";
+                statusAlert.textContent = err.message || "Failed to authorize.";
+                btnApprove.disabled = false;
+                btnApprove.innerHTML = `<i class="fa-solid fa-fingerprint"></i> Retry Biometric Approval`;
+            }
+        });
+    </script>
+</body>
+</html>

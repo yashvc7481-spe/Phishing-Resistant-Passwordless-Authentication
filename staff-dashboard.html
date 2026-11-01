@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberNova — SOC Telemetry &amp; Security Operations Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <!-- Chart.js for real-time security analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .filter-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+        .filter-select {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-family: var(--font-ui);
+            cursor: pointer;
+        }
+        .soc-charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 900px) {
+            .soc-charts-grid { grid-template-columns: 1fr; }
+        }
+        .chart-box {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+        }
+        .chart-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .canvas-container {
+            position: relative;
+            height: 200px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="staff-theme">
+<div class="dashboard-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <i class="fa-solid fa-shield-halved logo-icon"></i>
+                cyber<span>Nova</span>
+            </div>
+            <div class="sidebar-sub">SOC Operations Center</div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="sidebar-section-label">SOC Monitoring</div>
+            <a href="#" class="sidebar-link active">
+                <i class="fa-solid fa-radar"></i> Live Telemetry
+            </a>
+            <a href="phishing-demo.html" class="sidebar-link">
+                <i class="fa-solid fa-fish-fins"></i> Phishing Lab
+            </a>
+
+            <div class="sidebar-section-label">Portals</div>
+            <a href="index.html" class="sidebar-link">
+                <i class="fa-solid fa-house"></i> Home
+            </a>
+            <a href="student-login.html" class="sidebar-link">
+                <i class="fa-solid fa-graduation-cap"></i> Student Portal
+            </a>
+            <a href="staff-login.html" class="sidebar-link">
+                <i class="fa-solid fa-building-columns"></i> Staff Login
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="sidebar-avatar staff-avatar">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <div>
+                    <div class="sidebar-user-name" id="sidebarName">Loading...</div>
+                    <div class="sidebar-user-role" style="color: #A78BFA;">SOC Analyst · Administrative</div>
+                </div>
+            </div>
+            <button id="logoutBtn" class="btn btn-secondary btn-full btn-sm" style="margin-top: 12px; gap: 6px;">
+                <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="top-bar">
+            <span class="top-bar-title">SOC Security Dashboard</span>
+            <div class="top-bar-right">
+                <div class="live-indicator">
+                    <span class="live-dot"></span> Live · Auto-refresh 5s
+                </div>
+                <span id="userDisplayName" style="font-size: 13px; color: var(--text-secondary);">
+                    <i class="fa-solid fa-user-shield"></i> Loading...
+                </span>
+                <button id="logoutBtnTop" class="btn btn-ghost btn-sm" style="color: var(--critical);">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="content-area">
+
+            <!-- Metrics Row (Feature 6) -->
+            <div class="metrics-row" style="margin-bottom: 20px;">
+                <div class="metric-tile">
+                    <div class="metric-tile-icon green">
+                        <i class="fa-solid fa-shield-check"></i>
+                    </div>
+                    <div class="metric-tile-body">
+                        <div class="metric-tile-value" id="statActivePasskeys">—</div>
+                        <div class="metric-tile-label">Active Passkeys</div>
+                    </div>
+                </div>
+                <div class="metric-tile">
+                    <div class="metric-tile-icon blue">
+                        <i class="fa-solid fa-users"></i>
+                    </div>
+                    <div class="metric-tile-body">
+                        <div class="metric-tile-value" id="statTotalUsers">—</div>
+                        <div class="metric-tile-label">Portal Users</div>
+                    </div>
+                </div>
+                <div class="metric-tile">
+                    <div class="metric-tile-icon red">
+                        <i class="fa-solid fa-shield-virus"></i>
+                    </div>
+                    <div class="metric-tile-body">
+                        <div class="metric-tile-value" id="statPhishingBlocked">—</div>
+                        <div class="metric-tile-label">Phishing Blocked</div>
+                    </div>
+                </div>
+                <div class="metric-tile">
+                    <div class="metric-tile-icon amber">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div class="metric-tile-body">
+                        <div class="metric-tile-value" id="statHighRisk">—</div>
+                        <div class="metric-tile-label">High-Risk Events</div>
+                    </div>
+                </div>
+                <div class="metric-tile">
+                    <div class="metric-tile-icon cyan">
+                        <i class="fa-brands fa-bluetooth-b"></i>
+                    </div>
+                    <div class="metric-tile-body">
+                        <div class="metric-tile-value" id="statBluetoothDevices">—</div>
+                        <div class="metric-tile-label">BLE Proximity Devices</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visual Charts Grid (Feature 4 & 6) -->
+            <div class="soc-charts-grid">
+                <div class="chart-box">
+                    <div class="chart-title">
+                        <i class="fa-solid fa-chart-pie" style="color: var(--accent-cyan);"></i>
+                        Intelligent Risk Score Distribution
+                    </div>
+                    <div class="canvas-container">
+                        <canvas id="riskChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">
+                        <i class="fa-solid fa-chart-column" style="color: #A78BFA;"></i>
+                        Security Event Breakdown
+                    </div>
+                    <div class="canvas-container">
+                        <canvas id="eventsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SOC Audit Stream Panel (Feature 6) -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">
+                        <i class="fa-solid fa-radar"></i>
+                        Security Event Audit Stream
+                    </span>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span class="refresh-countdown" id="refreshLabel">Next refresh in 5s</span>
+                        <button onclick="loadSOCData()" class="btn btn-secondary btn-sm" id="refreshBtn">
+                            <i class="fa-solid fa-rotate-right"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Interactive Filters -->
+                <div class="filter-row">
+                    <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                        <i class="fa-solid fa-filter"></i> Filters:
+                    </span>
+                    <select id="filterSeverity" class="filter-select" onchange="applyFilters()">
+                        <option value="ALL">All Severities</option>
+                        <option value="CRITICAL">Critical Only</option>
+                        <option value="WARNING">Warning Only</option>
+                        <option value="INFO">Info Only</option>
+                    </select>
+                    <select id="filterRisk" class="filter-select" onchange="applyFilters()">
+                        <option value="ALL">All Risk Levels</option>
+                        <option value="HIGH">High Risk (&ge;70)</option>
+                        <option value="MEDIUM">Medium Risk (30-69)</option>
+                        <option value="LOW">Low Risk (&lt;30)</option>
+                    </select>
+                    <select id="filterSimulation" class="filter-select" onchange="applyFilters()">
+                        <option value="ALL">All Events (Live + Sim)</option>
+                        <option value="REAL">Real Events Only</option>
+                        <option value="SIM">Simulated Attacks Only</option>
+                    </select>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">Severity</th>
+                                <th>Event Type</th>
+                                <th>Risk Score</th>
+                                <th>Entity / Email</th>
+                                <th>IP Address</th>
+                                <th>Details &amp; Reason Breakdown</th>
+                                <th style="width: 100px;">Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody id="socLogsBody">
+                            <tr>
+                                <td colspan="7" class="empty-state" style="padding: 32px;">
+                                    <i class="fa-solid fa-radar" style="font-size: 24px; display: block; margin-bottom: 8px; opacity: 0.3;"></i>
+                                    Loading live audit stream...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Hidden Honeypot (Active Defense Tripwire) -->
+            <a href="/api/admin/export-system-keys" style="display:none;" id="admin-export">Export System Keys</a>
+        </div>
+    </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+    let countdown = 5;
+    let countdownInterval;
+    let rawLogs = [];
+    let riskChartInstance = null;
+    let eventsChartInstance = null;
+
+    function startCountdown() {
+        clearInterval(countdownInterval);
+        countdown = 5;
+        const label = document.getElementById("refreshLabel");
+        countdownInterval = setInterval(() => {
+            countdown--;
+            if (label) label.textContent = `Next refresh in ${countdown}s`;
+            if (countdown <= 0) countdown = 5;
+        }, 1000);
+    }
+
+    async function loadSOCData() {
+        try {
+            // Verify session
+            const meRes = await fetch("/api/me");
+            if (!meRes.ok) { window.location.href = "staff-login.html"; return; }
+            const meData = await meRes.json();
+
+            const name = meData.user.displayName || meData.user.email;
+            document.getElementById("userDisplayName").innerHTML =
+                `<i class="fa-solid fa-user-shield"></i> ${name}`;
+            document.getElementById("sidebarName").textContent = name;
+
+            // Load SOC Telemetry
+            const res = await fetch("/api/admin/soc-telemetry");
+            const data = await res.json();
+
+            // Update Metrics
+            document.getElementById("statActivePasskeys").textContent = data.stats.activePasskeys ?? data.stats.totalPasskeys;
+            document.getElementById("statTotalUsers").textContent = data.stats.totalUsers;
+            document.getElementById("statPhishingBlocked").textContent = data.stats.phishingBlocked;
+            document.getElementById("statHighRisk").textContent = data.stats.highRiskEvents ?? 0;
+            document.getElementById("statBluetoothDevices").textContent = data.stats.bluetoothDevices ?? 0;
+
+            // Render Charts
+            renderCharts(data.riskDistribution, data.eventBreakdown);
+
+            // Store logs and apply filters
+            rawLogs = data.logs || [];
+            applyFilters();
+
+            startCountdown();
+        } catch (err) {
+            console.error("SOC poll error:", err);
+        }
+    }
+
+    function renderCharts(riskDist = {}, eventBreakdown = []) {
+        // Chart 1: Risk Distribution (Doughnut)
+        const ctxRisk = document.getElementById("riskChart").getContext("2d");
+        const riskData = [
+            riskDist.low || 0,
+            riskDist.medium || 0,
+            riskDist.high || 0
+        ];
+
+        if (riskChartInstance) {
+            riskChartInstance.data.datasets[0].data = riskData;
+            riskChartInstance.update();
+        } else {
+            riskChartInstance = new Chart(ctxRisk, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Low Risk (<30)', 'Medium Risk (30-69)', 'High Risk (≥70)'],
+                    datasets: [{
+                        data: riskData,
+                        backgroundColor: ['#22C55E', '#F59E0B', '#EF4444'],
+                        borderColor: '#111C2F',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#94A3B8', font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        // Chart 2: Security Events (Bar)
+        const ctxEvents = document.getElementById("eventsChart").getContext("2d");
+        const labels = eventBreakdown.map(e => e.event_type.replace(/_/g, ' '));
+        const counts = eventBreakdown.map(e => e.count);
+
+        if (eventsChartInstance) {
+            eventsChartInstance.data.labels = labels;
+            eventsChartInstance.data.datasets[0].data = counts;
+            eventsChartInstance.update();
+        } else {
+            eventsChartInstance = new Chart(ctxEvents, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Occurrences',
+                        data: counts,
+                        backgroundColor: '#8B5CF6',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: '#94A3B8', font: { size: 10 } }, grid: { display: false } },
+                        y: { ticks: { color: '#94A3B8', font: { size: 10 } }, grid: { color: '#1E3050' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+    }
+
+    function applyFilters() {
+        const sevFilter = document.getElementById("filterSeverity").value;
+        const riskFilter = document.getElementById("filterRisk").value;
+        const simFilter = document.getElementById("filterSimulation").value;
+
+        const filtered = rawLogs.filter(log => {
+            if (sevFilter !== "ALL" && log.severity !== sevFilter) return false;
+            if (riskFilter !== "ALL" && (log.risk_level || "LOW") !== riskFilter) return false;
+            if (simFilter === "REAL" && log.is_simulation === 1) return false;
+            if (simFilter === "SIM" && log.is_simulation !== 1) return false;
+            return true;
+        });
+
+        const tbody = document.getElementById("socLogsBody");
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="empty-state" style="padding: 24px;">No events match the selected filters.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(log => {
+            let details = log.details;
+            try {
+                const parsed = JSON.parse(log.details);
+                details = Object.entries(parsed)
+                    .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+                    .join(" · ");
+            } catch(e) {}
+
+            const ts = new Date(log.timestamp);
+            const timeStr = ts.toLocaleTimeString();
+
+            const sevBadge = log.severity === 'CRITICAL' ? 'badge-red' : (log.severity === 'WARNING' ? 'badge-amber' : 'badge-green');
+            const riskBadge = log.risk_level === 'HIGH' ? 'badge-red' : (log.risk_level === 'MEDIUM' ? 'badge-amber' : 'badge-green');
+
+            return `
+                <tr>
+                    <td><span class="badge ${sevBadge}" style="font-size: 10px;">${log.severity}</span></td>
+                    <td style="font-family: var(--font-mono); font-weight: 600; font-size: 12px;">
+                        ${log.event_type}
+                        ${log.is_simulation ? '<span class="badge badge-amber" style="font-size: 9px; margin-left: 4px;">SIM</span>' : ''}
+                    </td>
+                    <td><span class="badge ${riskBadge}" style="font-size: 10px;">${log.risk_level || 'LOW'} (${log.risk_score || 0})</span></td>
+                    <td style="font-size: 12px; color: var(--text-primary); font-family: var(--font-mono);">${log.email || 'System'}</td>
+                    <td style="font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);">${log.ip_address}</td>
+                    <td style="font-size: 12px; color: var(--text-secondary); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${details}">${details}</td>
+                    <td style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">${timeStr}</td>
+                </tr>
+            `;
+        }).join("");
+    }
+
+    function logout() {
+        fetch("/api/logout", { method: "POST" }).then(() => {
+            window.location.href = "index.html";
+        });
+    }
+
+    document.getElementById("logoutBtn").addEventListener("click", logout);
+    document.getElementById("logoutBtnTop").addEventListener("click", logout);
+
+    // Initial poll
+    loadSOCData();
+    setInterval(loadSOCData, 5000);
+</script>
+</body>
+</html>
