@@ -16,9 +16,21 @@ const db = require("./database");
 const riskEngine = require("./risk-engine");
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = "cybernova-super-secret-jwt-key-2026";
-const RP_NAME = "cyberNova Enterprise Portal";
+const JWT_SECRET = process.env.JWT_SECRET || "cybernova-super-secret-jwt-key-2026";
+const RP_NAME = process.env.RP_NAME || "cyberNova Enterprise Portal";
+
+function getCookieOptions(req, maxAgeMs = 4 * 60 * 60 * 1000) {
+    const isHttps = req.secure || req.headers["x-forwarded-proto"] === "https" || process.env.NODE_ENV === "production";
+    const sameSite = process.env.COOKIE_SAMESITE || (isHttps ? "none" : "lax");
+    return {
+        httpOnly: true,
+        secure: isHttps,
+        sameSite: isHttps ? sameSite : "lax",
+        maxAge: maxAgeMs
+    };
+}
 
 // In-memory challenge stores with 2-minute timeouts
 const pendingChallenges = new Map();
@@ -57,13 +69,42 @@ app.use((req, res, next) => {
 // Serve frontend directly from project root
 app.use(express.static(__dirname));
 
-// Helper: Determine origin dynamically (supporting localhost:3000, 5500, or LAN IP)
+// Helper: Determine origin dynamically (supporting reverse proxies, custom domains, or LAN IP)
 function getOriginAndRpId(req) {
-    const origin = req.headers.origin || `http://${req.headers.host}`;
-    const url = new URL(origin);
-    const rpID = url.hostname;
+    if (process.env.EXPECTED_ORIGIN && process.env.RP_ID) {
+        return { origin: process.env.EXPECTED_ORIGIN, rpID: process.env.RP_ID };
+    }
+    const originHeader = req.headers.origin;
+    const proto = req.headers["x-forwarded-proto"] || (req.secure ? "https" : "http");
+    const host = req.headers["x-forwarded-host"] || req.headers.host;
+    const origin = originHeader || `${proto}://${host}`;
+    let rpID = process.env.RP_ID;
+    if (!rpID) {
+        try {
+            const url = new URL(origin);
+            rpID = url.hostname;
+        } catch {
+            rpID = "localhost";
+        }
+    }
     return { origin, rpID };
 }
+
+// Health check endpoint for Render & monitoring
+app.get("/api/health", (req, res) => {
+    try {
+        const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get();
+        res.json({
+            status: "healthy",
+            uptime: Math.floor(process.uptime()),
+            timestamp: new Date().toISOString(),
+            database: "connected",
+            users: userCount ? userCount.count : 0
+        });
+    } catch (err) {
+        res.status(500).json({ status: "unhealthy", error: err.message });
+    }
+});
 
 // Log security events to SQLite SOC table with risk scoring
 function logSecurityEvent(type, email, ip, details, severity = "INFO", riskScore = 0, riskLevel = "LOW", isSimulation = 0) {
@@ -352,10 +393,7 @@ app.post("/api/login/verify", rateLimiter(15, 60000), async (req, res) => {
             { expiresIn: "4h" }
         );
 
-        res.cookie("cybernova_session", token, {
-            httpOnly: true,
-            sameSite: "lax"
-        });
+        res.cookie("cybernova_session", token, getCookieOptions(req));
 
         logSecurityEvent("LOGIN_SUCCESS", email, req.ip, {
             role: user.role,
@@ -493,10 +531,7 @@ app.get("/api/auth/bluetooth/session-status", (req, res) => {
 
         if (pending.approved) {
             if (pending.token) {
-                res.cookie("cybernova_session", pending.token, {
-                    httpOnly: true,
-                    sameSite: "lax"
-                });
+                res.cookie("cybernova_session", pending.token, getCookieOptions(req));
             }
             return res.json({
                 status: "approved",
@@ -717,10 +752,7 @@ app.post("/api/auth/bluetooth/verify", (req, res) => {
             { expiresIn: "4h" }
         );
 
-        res.cookie("cybernova_session", token, {
-            httpOnly: true,
-            sameSite: "lax"
-        });
+        res.cookie("cybernova_session", token, getCookieOptions(req));
 
         logSecurityEvent("BLUETOOTH_PROXIMITY_AUTH", normalizedEmail, req.ip, {
             deviceName: matchedDevice.device_name,
@@ -923,10 +955,7 @@ app.post("/api/auth/fallback/verify", (req, res) => {
             { expiresIn: "4h" }
         );
 
-        res.cookie("cybernova_session", token, {
-            httpOnly: true,
-            sameSite: "lax"
-        });
+        res.cookie("cybernova_session", token, getCookieOptions(req));
 
         logSecurityEvent("EMERGENCY_FALLBACK_AUTH", email, req.ip, {
             role: user.role,
@@ -1128,10 +1157,7 @@ app.post("/api/recovery/verify", rateLimiter(5, 60000), (req, res) => {
             { expiresIn: "1h" }
         );
 
-        res.cookie("cybernova_session", token, {
-            httpOnly: true,
-            sameSite: "lax"
-        });
+        res.cookie("cybernova_session", token, getCookieOptions(req));
 
         logSecurityEvent("ACCOUNT_RECOVERY_SUCCESS", email, req.ip, {
             codeId: matchedRow.id,
@@ -1242,9 +1268,24 @@ app.get("/api/admin/export-system-keys", (req, res) => {
     });
 });
 
-app.listen(PORT, () => {
+// Global API 404 handler (ensures API always returns valid JSON, never HTML)
+app.use("/api", (req, res) => {
+    res.status(404).json({
+        error: `Endpoint not found: ${req.method} ${req.originalUrl}`
+    });
+});
+
+// Global error handling middleware (ensures all server errors return valid JSON)
+app.use((err, req, res, next) => {
+    console.error("Unhandled Server Error:", err);
+    res.status(err.status || 500).json({
+        error: err.message || "Internal server error occurred."
+    });
+});
+
+app.listen(PORT, "0.0.0.0", () => {
     console.log(`\n=================================================`);
-    console.log(`🚀 cyberNova Security Hub: http://localhost:${PORT}`);
+    console.log(`🚀 cyberNova Security Hub: http://0.0.0.0:${PORT}`);
     console.log(`🛡️ SOC Telemetry Ready | FIDO2 WebAuthn Active`);
     console.log(`=================================================\n`);
 });

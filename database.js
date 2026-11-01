@@ -1,5 +1,7 @@
+const path = require("path");
 const Database = require("better-sqlite3");
-const db = new Database("cybernova.db");
+const dbPath = process.env.DATABASE_PATH || path.join(__dirname, "cybernova.db");
+const db = new Database(dbPath);
 
 // Initialize tables
 db.exec(`
