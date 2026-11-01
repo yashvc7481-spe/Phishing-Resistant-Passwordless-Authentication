@@ -227,8 +227,21 @@
                     <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
                         Point your Phone Camera or Google Lens
                     </div>
-                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px;" id="btQrSubtext">
+                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;" id="btQrSubtext">
                         Direct Proximity Authentication &middot; Instantly approves this computer session
+                    </div>
+
+                    <div id="btQrUrlBox" style="font-size: 10px; font-family: monospace; color: #A78BFA; margin-bottom: 10px; word-break: break-all; padding: 5px 8px; background: rgba(167, 139, 250, 0.08); border-radius: 6px; border: 1px solid rgba(167, 139, 250, 0.15);">
+                        <i class="fa-solid fa-mobile-screen" style="margin-right: 4px;"></i><span id="btQrUrlDisplay">Loading network address…</span>
+                    </div>
+
+                    <div style="display: flex; gap: 6px; justify-content: center; margin-bottom: 10px;">
+                        <button type="button" id="btnToggleLanQr" class="btn btn-secondary" style="padding: 4px 10px; font-size: 10px;" title="Switch to Wi-Fi LAN IP">
+                            <i class="fa-solid fa-wifi"></i> Wi-Fi LAN
+                        </button>
+                        <button type="button" id="btnToggleProdQr" class="btn btn-secondary" style="padding: 4px 10px; font-size: 10px;" title="Switch to Vercel HTTPS">
+                            <i class="fa-solid fa-globe"></i> Vercel HTTPS
+                        </button>
                     </div>
 
                     <div style="display: flex; gap: 8px; justify-content: center;">

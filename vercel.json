@@ -15,6 +15,14 @@
   ],
   "rewrites": [
     {
+      "source": "/mobile",
+      "destination": "/mobile-auth.html"
+    },
+    {
+      "source": "/mobile-auth",
+      "destination": "/mobile-auth.html"
+    },
+    {
       "source": "/api/:match*",
       "destination": "https://cybernova-backend.onrender.com/api/:match*"
     }

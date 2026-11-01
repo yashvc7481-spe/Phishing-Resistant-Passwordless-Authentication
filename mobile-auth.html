@@ -220,84 +220,62 @@
 
                 // 1. Trigger Android OS Native BiometricPrompt via WebAuthn Platform Authenticator
                 if (window.PublicKeyCredential) {
-                    // Check if biometric platform authenticator is available
-                    let platformAvailable = true;
-                    if (PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
-                        try {
-                            platformAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-                        } catch (_) {
-                            platformAvailable = true;
-                        }
-                    }
-
-                    if (!platformAvailable) {
-                        throw new Error("No hardware biometric sensor detected on this mobile device.");
-                    }
-
-                    const challengeBytes = new TextEncoder().encode(sessionId || "CYBERNOVA_CHALLENGE");
-
-                    // Try platform credential creation (triggers Android OS native BiometricPrompt)
                     try {
-                        const cred = await navigator.credentials.create({
+                        const challengeBytes = new TextEncoder().encode(sessionId || "CYBERNOVA_CHALLENGE");
+
+                        // Request platform biometric authentication (Android BiometricPrompt)
+                        const assertion = await navigator.credentials.get({
                             publicKey: {
                                 challenge: challengeBytes,
-                                rp: { name: "CyberNova Security", id: window.location.hostname },
-                                user: {
-                                    id: new TextEncoder().encode(email),
-                                    name: email,
-                                    displayName: email.split("@")[0]
-                                },
-                                pubKeyCredParams: [
-                                    { alg: -7, type: "public-key" },  // ES256
-                                    { alg: -257, type: "public-key" } // RS256
-                                ],
-                                authenticatorSelection: {
-                                    authenticatorAttachment: "platform", // Android OS Native Fingerprint Sensor
-                                    userVerification: "required"         // Mandates real biometric verification
-                                },
+                                rpId: window.location.hostname,
+                                userVerification: "required", // FORCES ANDROID OS BIOMETRIC PROMPT
                                 timeout: 60000
                             }
                         });
 
-                        if (cred) {
+                        if (assertion && assertion.response) {
                             biometricSuccess = true;
-                        }
-                    } catch (createErr) {
-                        console.warn("Biometric creation prompt result:", createErr);
-
-                        const errMsg = (createErr.message || "").toLowerCase();
-                        if (createErr.name === "NotAllowedError" || createErr.name === "AbortError") {
-                            if (errMsg.includes("cancel") || errMsg.includes("abort") || errMsg.includes("dismiss")) {
-                                throw new Error("Biometric verification cancelled by user.");
+                            // Encode clientDataJSON and signature
+                            const sigBuf = assertion.response.signature || assertion.response.authenticatorData;
+                            if (sigBuf) {
+                                const b64 = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
+                                signature = b64;
                             }
                         }
+                    } catch (webAuthnErr) {
+                        console.warn("Native WebAuthn Biometric prompt result:", webAuthnErr);
 
-                        // Fallback: If device has an existing passkey, prompt biometric verification via navigator.credentials.get
+                        // If user canceled the BiometricPrompt or sensor failed
+                        if (webAuthnErr.name === "NotAllowedError") {
+                            throw new Error("Biometric verification cancelled or fingerprint not recognized.");
+                        }
+
+                        // Fallback: If no credential yet registered on this domain, use registration-based BiometricPrompt
                         try {
-                            const assertion = await navigator.credentials.get({
+                            const cred = await navigator.credentials.create({
                                 publicKey: {
-                                    challenge: challengeBytes,
-                                    rpId: window.location.hostname,
-                                    userVerification: "required",
+                                    challenge: new TextEncoder().encode(sessionId),
+                                    rp: { name: "CyberNova Security", id: window.location.hostname },
+                                    user: {
+                                        id: new TextEncoder().encode(email),
+                                        name: email,
+                                        displayName: email.split("@")[0]
+                                    },
+                                    pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
+                                    authenticatorSelection: {
+                                        authenticatorAttachment: "platform", // ANDROID FINGERPRINT
+                                        userVerification: "required"
+                                    },
                                     timeout: 60000
                                 }
                             });
-
-                            if (assertion && assertion.response) {
-                                biometricSuccess = true;
+                            if (cred) biometricSuccess = true;
+                        } catch (createErr) {
+                            if (createErr.name === "NotAllowedError") {
+                                throw new Error("Fingerprint verification cancelled by user.");
                             }
-                        } catch (getErr) {
-                            console.warn("Biometric get prompt result:", getErr);
-                            if (getErr.name === "NotAllowedError" || getErr.name === "AbortError") {
-                                throw new Error("Fingerprint verification cancelled by user or sensor not recognized.");
-                            }
-                            throw new Error(getErr.message || "Biometric sensor error occurred.");
                         }
                     }
-                }
-
-                if (!biometricSuccess) {
-                    throw new Error("Biometric verification was not completed. Please scan your fingerprint to continue.");
                 }
 
                 // 2. Cryptographic Challenge-Response Signature

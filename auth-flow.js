@@ -84,6 +84,10 @@ export class CyberNovaAuth {
         this.btQrCodeImg              = document.getElementById("btQrCodeImg");
         this.btQrCountdown            = document.getElementById("btQrCountdown");
         this.btnRefreshQr             = document.getElementById("btnRefreshQr");
+        this.btQrUrlDisplay           = document.getElementById("btQrUrlDisplay");
+        this.btnToggleLanQr           = document.getElementById("btnToggleLanQr");
+        this.btnToggleProdQr          = document.getElementById("btnToggleProdQr");
+        this.preferredQrTarget        = null; // 'lan' or 'prod'
         this.qrPollInterval           = null;
         this.qrCountdownTimer         = null;
 
@@ -407,6 +411,20 @@ export class CyberNovaAuth {
         // 12. Refresh QR Code
         this.btnRefreshQr?.addEventListener("click", (e) => {
             e.preventDefault();
+            this.generateDirectQr();
+        });
+
+        // 13. Toggle Wi-Fi LAN QR
+        this.btnToggleLanQr?.addEventListener("click", (e) => {
+            e.preventDefault();
+            this.preferredQrTarget = "lan";
+            this.generateDirectQr();
+        });
+
+        // 14. Toggle Vercel HTTPS QR
+        this.btnToggleProdQr?.addEventListener("click", (e) => {
+            e.preventDefault();
+            this.preferredQrTarget = "prod";
             this.generateDirectQr();
         });
 
@@ -791,12 +809,51 @@ export class CyberNovaAuth {
             const sessionId = challengeData.sessionId;
             this.currentBluetoothSession = challengeData;
 
-            // Generate full mobile auth URL
-            const mobileUrl = window.location.origin + "/mobile-auth.html?session=" + encodeURIComponent(sessionId) + "&email=" + encodeURIComponent(email);
+            // Generate environment-aware mobile URL (never use localhost on phone QR)
+            let mobileUrl = "";
 
-            // Render QR Code via clean SVG/PNG image
+            if (this.preferredQrTarget === "prod") {
+                mobileUrl = challengeData.prodMobileUrl || ("https://cybernova-auth.vercel.app/mobile?session=" + encodeURIComponent(sessionId) + "&email=" + encodeURIComponent(email));
+            } else if (this.preferredQrTarget === "lan") {
+                mobileUrl = challengeData.lanMobileUrl || challengeData.mobileAuthUrl;
+            } else {
+                // Default: Environment-based configuration
+                // 1. If currently on production Vercel/Render, use production HTTPS domain
+                // 2. If on local development, use accessible LAN IP (e.g. 192.168.31.63) so phone on Wi-Fi connects
+                if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+                    mobileUrl = window.location.origin + "/mobile?session=" + encodeURIComponent(sessionId) + "&email=" + encodeURIComponent(email);
+                } else {
+                    mobileUrl = challengeData.mobileAuthUrl || challengeData.lanMobileUrl || ("https://cybernova-auth.vercel.app/mobile?session=" + encodeURIComponent(sessionId) + "&email=" + encodeURIComponent(email));
+                }
+            }
+
+            // Fallback safety: ensure mobileUrl never contains literal "localhost" or "127.0.0.1"
+            if (mobileUrl.includes("localhost") || mobileUrl.includes("127.0.0.1")) {
+                const lan = challengeData.lanIp || "192.168.31.63";
+                mobileUrl = mobileUrl.replace("localhost", lan).replace("127.0.0.1", lan);
+            }
+
+            // Display active URL preview
+            if (this.btQrUrlDisplay) {
+                this.btQrUrlDisplay.textContent = mobileUrl;
+            }
+
+            // Highlight active network toggle button
+            const isProdActive = mobileUrl.startsWith("https://cybernova-auth.vercel.app");
+            if (this.btnToggleProdQr) {
+                this.btnToggleProdQr.style.borderColor = isProdActive ? "#38BDF8" : "";
+                this.btnToggleProdQr.style.background = isProdActive ? "rgba(56, 189, 248, 0.15)" : "";
+                this.btnToggleProdQr.style.color = isProdActive ? "#38BDF8" : "";
+            }
+            if (this.btnToggleLanQr) {
+                this.btnToggleLanQr.style.borderColor = !isProdActive ? "#10B981" : "";
+                this.btnToggleLanQr.style.background = !isProdActive ? "rgba(16, 185, 129, 0.15)" : "";
+                this.btnToggleLanQr.style.color = !isProdActive ? "#10B981" : "";
+            }
+
+            // Render QR Code via high-resolution image API
             if (this.btQrCodeImg) {
-                this.btQrCodeImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=" + encodeURIComponent(mobileUrl) + "&margin=6&color=0-0-0&bgcolor=255-255-255";
+                this.btQrCodeImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent(mobileUrl) + "&margin=6&color=0-0-0&bgcolor=255-255-255";
             }
 
             this.setScannerState("Scanning for Devices", "Awaiting Mobile Scan · QR Active");
