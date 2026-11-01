@@ -1,12 +1,10 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
-const os = require("os");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
-const QRCode = require("qrcode");
 const {
     generateRegistrationOptions,
     verifyRegistrationResponse,
@@ -18,39 +16,14 @@ const db = require("./database");
 const riskEngine = require("./risk-engine");
 
 const app = express();
-app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || "cybernova-super-secret-jwt-key-2026";
-const RP_NAME = process.env.RP_NAME || "cyberNova Enterprise Portal";
-
-function getCookieOptions(req, maxAgeMs = 4 * 60 * 60 * 1000) {
-    const isHttps = req.secure || req.headers["x-forwarded-proto"] === "https" || process.env.NODE_ENV === "production";
-    const sameSite = process.env.COOKIE_SAMESITE || (isHttps ? "none" : "lax");
-    return {
-        httpOnly: true,
-        secure: isHttps,
-        sameSite: isHttps ? sameSite : "lax",
-        maxAge: maxAgeMs
-    };
-}
+const JWT_SECRET = "cybernova-super-secret-jwt-key-2026";
+const RP_NAME = "cyberNova Enterprise Portal";
 
 // In-memory challenge stores with 2-minute timeouts
 const pendingChallenges = new Map();
 const pendingLoginChallenges = new Map();
 const pendingBluetoothChallenges = new Map();
-const pendingQrSessions = new Map();
-
-function getLanIp() {
-    const interfaces = os.networkInterfaces();
-    for (const dev in interfaces) {
-        for (const details of interfaces[dev]) {
-            if (details.family === "IPv4" && !details.internal) {
-                return details.address;
-            }
-        }
-    }
-    return "localhost";
-}
 
 // Rate limiting store (rolling 60s window)
 const rateLimitMap = new Map();
@@ -75,45 +48,22 @@ app.use(cors({
     credentials: true
 }));
 
+// Permissions-Policy header for Web Bluetooth API compatibility in Chromium (Chrome 113+)
+app.use((req, res, next) => {
+    res.setHeader("Permissions-Policy", "bluetooth=(self)");
+    next();
+});
+
 // Serve frontend directly from project root
 app.use(express.static(__dirname));
 
-// Helper: Determine origin dynamically (supporting reverse proxies, custom domains, or LAN IP)
+// Helper: Determine origin dynamically (supporting localhost:3000, 5500, or LAN IP)
 function getOriginAndRpId(req) {
-    if (process.env.EXPECTED_ORIGIN && process.env.RP_ID) {
-        return { origin: process.env.EXPECTED_ORIGIN, rpID: process.env.RP_ID };
-    }
-    const originHeader = req.headers.origin;
-    const proto = req.headers["x-forwarded-proto"] || (req.secure ? "https" : "http");
-    const host = req.headers["x-forwarded-host"] || req.headers.host;
-    const origin = originHeader || `${proto}://${host}`;
-    let rpID = process.env.RP_ID;
-    if (!rpID) {
-        try {
-            const url = new URL(origin);
-            rpID = url.hostname;
-        } catch {
-            rpID = "localhost";
-        }
-    }
+    const origin = req.headers.origin || `http://${req.headers.host}`;
+    const url = new URL(origin);
+    const rpID = url.hostname;
     return { origin, rpID };
 }
-
-// Health check endpoint for Render & monitoring
-app.get("/api/health", (req, res) => {
-    try {
-        const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get();
-        res.json({
-            status: "healthy",
-            uptime: Math.floor(process.uptime()),
-            timestamp: new Date().toISOString(),
-            database: "connected",
-            users: userCount ? userCount.count : 0
-        });
-    } catch (err) {
-        res.status(500).json({ status: "unhealthy", error: err.message });
-    }
-});
 
 // Log security events to SQLite SOC table with risk scoring
 function logSecurityEvent(type, email, ip, details, severity = "INFO", riskScore = 0, riskLevel = "LOW", isSimulation = 0) {
@@ -402,7 +352,10 @@ app.post("/api/login/verify", rateLimiter(15, 60000), async (req, res) => {
             { expiresIn: "4h" }
         );
 
-        res.cookie("cybernova_session", token, getCookieOptions(req));
+        res.cookie("cybernova_session", token, {
+            httpOnly: true,
+            sameSite: "lax"
+        });
 
         logSecurityEvent("LOGIN_SUCCESS", email, req.ip, {
             role: user.role,
@@ -436,6 +389,45 @@ app.post("/api/login/verify", rateLimiter(15, 60000), async (req, res) => {
 
 // ------------------- BLUETOOTH AUTHENTICATION (CHALLENGE-RESPONSE) -------------------
 
+// Helper: Verify cryptographic challenge signature from registered BLE authenticator
+function verifyBluetoothSignature(publicKey, challenge, signatureBase64) {
+    if (!publicKey || !challenge || !signatureBase64) return false;
+    try {
+        const sigBuffer = Buffer.from(signatureBase64, "base64");
+        const dataBuffer = Buffer.from(challenge, "utf8");
+
+        let formattedKey = String(publicKey).trim();
+        if (!formattedKey.includes("-----BEGIN")) {
+            formattedKey = `-----BEGIN PUBLIC KEY-----\n${formattedKey.match(/.{1,64}/g).join("\n")}\n-----END PUBLIC KEY-----`;
+        }
+
+        // 1. Try IEEE-P1363 encoding (standard output of WebCrypto API ECDSA)
+        try {
+            if (crypto.verify("SHA256", dataBuffer, { key: formattedKey, dsaEncoding: "ieee-p1363" }, sigBuffer)) {
+                return true;
+            }
+        } catch (e1) {}
+
+        // 2. Try DER encoding (Node.js / OpenSSL standard format)
+        try {
+            if (crypto.verify("SHA256", dataBuffer, { key: formattedKey, dsaEncoding: "der" }, sigBuffer)) {
+                return true;
+            }
+        } catch (e2) {}
+
+        // 3. Fallback generic verify
+        try {
+            if (crypto.verify("SHA256", dataBuffer, formattedKey, sigBuffer)) {
+                return true;
+            }
+        } catch (e3) {}
+
+        return false;
+    } catch (err) {
+        return false;
+    }
+}
+
 // 1. Request cryptographic challenge for Bluetooth Proximity
 app.post("/api/auth/bluetooth/challenge", (req, res) => {
     try {
@@ -449,6 +441,7 @@ app.post("/api/auth/bluetooth/challenge", (req, res) => {
             user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
         }
 
+        const { rpID } = getOriginAndRpId(req);
         const sessionId = "bt_sess_" + crypto.randomBytes(16).toString("hex");
         const challenge = "CN-PROX-" + crypto.randomBytes(20).toString("hex").toUpperCase();
         const expiresAt = Date.now() + 90000; // 90 seconds lifetime
@@ -458,6 +451,7 @@ app.post("/api/auth/bluetooth/challenge", (req, res) => {
             challenge,
             userId: user.id,
             email: user.email,
+            rpId: rpID,
             expiresAt,
             createdAt: Date.now()
         });
@@ -472,6 +466,7 @@ app.post("/api/auth/bluetooth/challenge", (req, res) => {
             sessionId,
             challenge,
             rpName: RP_NAME,
+            rpId: rpID,
             expiresInSeconds: 90
         });
     } catch (err) {
@@ -480,24 +475,24 @@ app.post("/api/auth/bluetooth/challenge", (req, res) => {
     }
 });
 
-// 2. Verify Bluetooth device proximity challenge response
+// 2. Verify Bluetooth device proximity challenge response with Cryptographic Proof
 app.post("/api/auth/bluetooth/verify", (req, res) => {
     try {
-        const { sessionId, email, deviceName, deviceId, challengeProof } = req.body;
+        const { sessionId, email, deviceName, deviceId, signature, challengeProof } = req.body;
         const normalizedEmail = String(email || "").trim().toLowerCase();
         const { origin, rpID } = getOriginAndRpId(req);
 
         const pending = pendingBluetoothChallenges.get(sessionId);
         if (!pending || Date.now() > pending.expiresAt) {
             pendingBluetoothChallenges.delete(sessionId);
-            return res.status(400).json({ error: "Bluetooth proximity challenge expired or invalid. Please re-connect." });
+            return res.status(400).json({ error: "Bluetooth proximity challenge expired or invalid. Please re-scan." });
         }
 
         if (pending.email !== normalizedEmail) {
             return res.status(403).json({ error: "Identity mismatch for this Bluetooth challenge." });
         }
 
-        // Consume one-time challenge
+        // Consume one-time challenge immediately (strict replay prevention)
         pendingBluetoothChallenges.delete(sessionId);
 
         const user = db.prepare("SELECT * FROM users WHERE id = ?").get(pending.userId);
@@ -505,18 +500,81 @@ app.post("/api/auth/bluetooth/verify", (req, res) => {
 
         const cleanDevName = String(deviceName || "Verified Bluetooth Device").slice(0, 80);
         const cleanDevId = String(deviceId || ("BLE-" + crypto.randomBytes(6).toString("hex"))).slice(0, 100);
+        const clientSignature = signature || challengeProof;
 
-        // Security Check: Block revoked devices
-        const revokedDevice = db.prepare(
-            "SELECT id FROM bluetooth_devices WHERE user_id = ? AND (device_identifier = ? OR device_name = ?) AND status = 'revoked'"
-        ).get(user.id, cleanDevId, cleanDevName);
+        if (!clientSignature) {
+            return res.status(400).json({ error: "Cryptographic signature proof is required." });
+        }
 
+        // Query all registered Bluetooth authenticators for this user
+        const allUserBtDevices = db.prepare(
+            "SELECT id, device_name, device_identifier, status, public_key, algorithm FROM bluetooth_devices WHERE user_id = ?"
+        ).all(user.id);
+
+        if (allUserBtDevices.length === 0) {
+            logSecurityEvent("BLUETOOTH_AUTH_BLOCKED_UNPAIRED", normalizedEmail, req.ip, {
+                deviceName: cleanDevName,
+                deviceId: cleanDevId
+            }, "WARNING", 50, "MEDIUM");
+            return res.status(403).json({
+                error: "Access Denied: No Bluetooth authenticator is registered for this account. Please pair a trusted BLE device in your dashboard first."
+            });
+        }
+
+        // Security Check 1: Block revoked devices
+        const revokedDevice = allUserBtDevices.find(
+            d => d.status === "revoked" && (d.device_identifier === cleanDevId || d.device_name === cleanDevName)
+        );
         if (revokedDevice) {
             logSecurityEvent("BLUETOOTH_AUTH_BLOCKED_REVOKED", normalizedEmail, req.ip, {
                 deviceName: cleanDevName,
                 deviceId: cleanDevId
-            }, "CRITICAL", 75, "HIGH");
-            return res.status(403).json({ error: "Access Denied: This Bluetooth device has been revoked and cannot be used for authentication." });
+            }, "CRITICAL", 80, "HIGH");
+            return res.status(403).json({
+                error: "Access Denied: This Bluetooth device has been revoked and cannot be used for authentication."
+            });
+        }
+
+        // Security Check 2: Match registered active device with public key
+        let matchedDevice = allUserBtDevices.find(
+            d => d.status === "active" && (d.device_identifier === cleanDevId || d.device_name === cleanDevName)
+        );
+
+        // Fallback: If user has exactly one active registered device with public key, match it
+        if (!matchedDevice) {
+            const activeTokens = allUserBtDevices.filter(d => d.status === "active" && d.public_key);
+            if (activeTokens.length === 1) {
+                matchedDevice = activeTokens[0];
+            }
+        }
+
+        if (!matchedDevice || matchedDevice.status !== "active") {
+            logSecurityEvent("BLUETOOTH_AUTH_UNKNOWN_DEVICE", normalizedEmail, req.ip, {
+                deviceName: cleanDevName,
+                deviceId: cleanDevId
+            }, "WARNING", 55, "MEDIUM");
+            return res.status(403).json({
+                error: "Access Denied: Selected device is not paired or trusted for this account. Hardware pairing is required."
+            });
+        }
+
+        if (!matchedDevice.public_key) {
+            return res.status(403).json({
+                error: "Access Denied: Registered device lacks a cryptographic public key. Please re-pair the device in the dashboard."
+            });
+        }
+
+        // Security Check 3: Cryptographic Signature Verification
+        const isSignatureValid = verifyBluetoothSignature(matchedDevice.public_key, pending.challenge, clientSignature);
+        if (!isSignatureValid) {
+            logSecurityEvent("BLUETOOTH_SIGNATURE_MISMATCH", normalizedEmail, req.ip, {
+                deviceName: cleanDevName,
+                deviceId: cleanDevId,
+                reason: "Cryptographic signature failed verification against registered public key"
+            }, "CRITICAL", 90, "HIGH");
+            return res.status(401).json({
+                error: "Authentication Denied: Cryptographic signature verification failed. Private key proof does not match registered public key."
+            });
         }
 
         // Intelligent Risk Analysis for Bluetooth Authentication
@@ -537,19 +595,8 @@ app.post("/api/auth/bluetooth/verify", (req, res) => {
             });
         }
 
-        // Record or update paired Bluetooth device in database
-        const existingDevice = db.prepare(
-            "SELECT id, status FROM bluetooth_devices WHERE user_id = ? AND (device_identifier = ? OR device_name = ?)"
-        ).get(user.id, cleanDevId, cleanDevName);
-
-        if (existingDevice) {
-            db.prepare("UPDATE bluetooth_devices SET last_used = CURRENT_TIMESTAMP WHERE id = ?").run(existingDevice.id);
-        } else {
-            db.prepare(`
-                INSERT INTO bluetooth_devices (user_id, device_name, device_identifier, status, last_used)
-                VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP)
-            `).run(user.id, cleanDevName, cleanDevId);
-        }
+        // Update paired Bluetooth device last_used
+        db.prepare("UPDATE bluetooth_devices SET last_used = CURRENT_TIMESTAMP WHERE id = ?").run(matchedDevice.id);
 
         // Issue Secure HTTP-Only JWT Session
         const token = jwt.sign(
@@ -558,12 +605,15 @@ app.post("/api/auth/bluetooth/verify", (req, res) => {
             { expiresIn: "4h" }
         );
 
-        res.cookie("cybernova_session", token, getCookieOptions(req));
+        res.cookie("cybernova_session", token, {
+            httpOnly: true,
+            sameSite: "lax"
+        });
 
         logSecurityEvent("BLUETOOTH_PROXIMITY_AUTH", normalizedEmail, req.ip, {
-            deviceName: cleanDevName,
-            deviceIdentifier: cleanDevId.substring(0, 16) + "...",
-            challengeProof: challengeProof ? "HMAC/GATT Verified" : "Proximity Channel Verified",
+            deviceName: matchedDevice.device_name,
+            deviceIdentifier: matchedDevice.device_identifier.substring(0, 16) + "...",
+            cryptographicProof: "ECDSA_P256_VERIFIED",
             role: user.role
         }, "INFO", riskAssessment.score, riskAssessment.level);
 
@@ -574,9 +624,10 @@ app.post("/api/auth/bluetooth/verify", (req, res) => {
             redirect: user.role === "student" ? "/student-dashboard.html" : "/staff-dashboard.html",
             telemetry: {
                 authMethod: "Web Bluetooth GATT Proximity",
-                device: cleanDevName,
-                deviceIdentifier: cleanDevId.substring(0, 16) + "...",
+                device: matchedDevice.device_name,
+                deviceIdentifier: matchedDevice.device_identifier.substring(0, 16) + "...",
                 challengeVerified: true,
+                cryptoVerified: true,
                 proximityVerified: true,
                 riskScore: riskAssessment.score,
                 riskLevel: riskAssessment.level
@@ -589,174 +640,13 @@ app.post("/api/auth/bluetooth/verify", (req, res) => {
     }
 });
 
-// ------------------- FIDO2 HYBRID / QR CODE BLUETOOTH PROXIMITY -------------------
-
-// 1. Generate Ephemeral QR Code for Phone Proximity Pairing
-app.post("/api/auth/hybrid-qr/generate", async (req, res) => {
-    try {
-        const email = String(req.body.email || "").trim().toLowerCase();
-        if (!email) return res.status(400).json({ error: "Email is required." });
-
-        let user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
-        if (!user) {
-            db.prepare("INSERT INTO users (email, role, display_name) VALUES (?, ?, ?)")
-              .run(email, email.includes("staff") ? "staff" : "student", email.split("@")[0]);
-            user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
-        }
-
-        const sessionId = "qr_sess_" + crypto.randomBytes(16).toString("hex");
-        const challenge = "CN-PROX-QR-" + crypto.randomBytes(16).toString("hex").toUpperCase();
-        const expiresAt = Date.now() + 180000; // 3 minutes
-
-        pendingQrSessions.set(sessionId, {
-            sessionId,
-            challenge,
-            userId: user.id,
-            email: user.email,
-            role: user.role,
-            status: "pending",
-            expiresAt,
-            createdAt: Date.now()
-        });
-
-        // Determine accessible URL for mobile phone scan
-        const hostIp = getLanIp();
-        const port = PORT;
-        const mobileAuthUrl = `http://${hostIp}:${port}/mobile-auth.html?session=${sessionId}&email=${encodeURIComponent(user.email)}`;
-
-        // Generate sharp QR Code Data URL (PNG base64)
-        const qrCodeDataUrl = await QRCode.toDataURL(mobileAuthUrl, {
-            errorCorrectionLevel: "M",
-            margin: 1,
-            width: 240,
-            color: {
-                dark: "#0F172A",
-                light: "#FFFFFF"
-            }
-        });
-
-        logSecurityEvent("BLUETOOTH_QR_GENERATED", email, req.ip, {
-            sessionId: sessionId.substring(0, 14) + "...",
-            lanIp: hostIp
-        }, "INFO", 5, "LOW");
-
-        res.json({
-            success: true,
-            sessionId,
-            challenge,
-            qrCodeDataUrl,
-            mobileAuthUrl,
-            expiresInSeconds: 180
-        });
-    } catch (err) {
-        console.error("QR generation error:", err);
-        res.status(500).json({ error: "Failed to generate QR code." });
-    }
-});
-
-// 2. Poll QR Proximity Authorization Status from Desktop
-app.get("/api/auth/hybrid-qr/status", (req, res) => {
-    try {
-        const sessionId = String(req.query.sessionId || "").trim();
-        const session = pendingQrSessions.get(sessionId);
-
-        if (!session) {
-            return res.status(404).json({ error: "QR session expired or not found." });
-        }
-
-        if (Date.now() > session.expiresAt) {
-            pendingQrSessions.delete(sessionId);
-            return res.status(410).json({ error: "QR code expired. Please refresh to generate a new one." });
-        }
-
-        if (session.status === "approved") {
-            const user = db.prepare("SELECT * FROM users WHERE id = ?").get(session.userId);
-            pendingQrSessions.delete(sessionId);
-
-            const token = jwt.sign(
-                { id: user.id, email: user.email, role: user.role, displayName: user.display_name, authMethod: "bluetooth_hybrid_qr" },
-                JWT_SECRET,
-                { expiresIn: "4h" }
-            );
-
-            res.cookie("cybernova_session", token, getCookieOptions(req));
-
-            return res.json({
-                status: "approved",
-                success: true,
-                role: user.role,
-                redirect: user.role === "student" ? "/student-dashboard.html" : "/staff-dashboard.html",
-                device: session.deviceName || "Mobile Phone BLE Authenticator"
-            });
-        }
-
-        res.json({
-            status: session.status,
-            expiresInSeconds: Math.max(0, Math.round((session.expiresAt - Date.now()) / 1000))
-        });
-    } catch (err) {
-        res.status(500).json({ error: "Failed to check session status." });
-    }
-});
-
-// 3. Approve Proximity Sign-In from Mobile Phone
-app.post("/api/auth/hybrid-qr/approve", (req, res) => {
-    try {
-        const { sessionId, deviceName } = req.body;
-        const session = pendingQrSessions.get(sessionId);
-
-        if (!session || Date.now() > session.expiresAt) {
-            return res.status(400).json({ error: "Invalid or expired QR authentication session." });
-        }
-
-        const user = db.prepare("SELECT * FROM users WHERE id = ?").get(session.userId);
-        if (!user) return res.status(404).json({ error: "User not found." });
-
-        const cleanDevName = String(deviceName || "Mobile Phone Proximity Token (BLE Hybrid)").slice(0, 80);
-        const devIdentifier = "BLE-PHONE-" + crypto.randomBytes(6).toString("hex").toUpperCase();
-
-        const existingDevice = db.prepare(
-            "SELECT id, status FROM bluetooth_devices WHERE user_id = ? AND device_name = ?"
-        ).get(user.id, cleanDevName);
-
-        if (existingDevice) {
-            db.prepare("UPDATE bluetooth_devices SET last_used = CURRENT_TIMESTAMP WHERE id = ?").run(existingDevice.id);
-        } else {
-            db.prepare(`
-                INSERT INTO bluetooth_devices (user_id, device_name, device_identifier, status, last_used)
-                VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP)
-            `).run(user.id, cleanDevName, devIdentifier);
-        }
-
-        // Mark session approved
-        session.status = "approved";
-        session.deviceName = cleanDevName;
-
-        logSecurityEvent("BLUETOOTH_HYBRID_QR_AUTH", user.email, req.ip, {
-            sessionId: sessionId.substring(0, 14) + "...",
-            deviceName: cleanDevName,
-            deviceIdentifier: devIdentifier,
-            method: "FIDO2 Hybrid caBLE / QR Bluetooth Link"
-        }, "INFO", 5, "LOW");
-
-        res.json({
-            success: true,
-            message: "Mobile biometric verification approved. Desktop will sign in automatically.",
-            user: { email: user.email, displayName: user.display_name }
-        });
-    } catch (err) {
-        console.error("QR approval error:", err);
-        res.status(500).json({ error: "Failed to approve QR session." });
-    }
-});
-
 // ------------------- BLUETOOTH DEVICE MANAGEMENT -------------------
 
 // List authenticated user's trusted Bluetooth devices
 app.get("/api/bluetooth/devices", authenticateToken, (req, res) => {
     try {
         const devices = db.prepare(`
-            SELECT id, device_name, device_identifier, paired_at, last_used, status
+            SELECT id, device_name, device_identifier, paired_at, last_used, status, algorithm, (public_key IS NOT NULL) AS has_key
             FROM bluetooth_devices
             WHERE user_id = ?
             ORDER BY paired_at DESC
@@ -770,20 +660,27 @@ app.get("/api/bluetooth/devices", authenticateToken, (req, res) => {
 // Pair a new trusted Bluetooth device from dashboard scanner
 app.post("/api/bluetooth/pair", authenticateToken, (req, res) => {
     try {
-        const { deviceName, deviceIdentifier } = req.body;
+        const { deviceName, deviceIdentifier, publicKey, algorithm } = req.body;
         if (!deviceName || !deviceName.trim()) {
             return res.status(400).json({ error: "Device name is required." });
         }
 
         const cleanDevName = String(deviceName).trim().slice(0, 80);
         const cleanDevId = String(deviceIdentifier || ("BLE-" + crypto.randomBytes(8).toString("hex"))).trim().slice(0, 100);
+        const cleanPubKey = publicKey ? String(publicKey).trim() : null;
+        const cleanAlgo = String(algorithm || "ES256").trim().slice(0, 20);
 
         const existing = db.prepare(
             "SELECT id, status FROM bluetooth_devices WHERE user_id = ? AND (device_identifier = ? OR device_name = ?)"
         ).get(req.user.id, cleanDevId, cleanDevName);
 
         if (existing) {
-            db.prepare("UPDATE bluetooth_devices SET status = 'active', last_used = CURRENT_TIMESTAMP WHERE id = ?").run(existing.id);
+            if (cleanPubKey) {
+                db.prepare("UPDATE bluetooth_devices SET status = 'active', public_key = ?, algorithm = ?, last_used = CURRENT_TIMESTAMP WHERE id = ?")
+                  .run(cleanPubKey, cleanAlgo, existing.id);
+            } else {
+                db.prepare("UPDATE bluetooth_devices SET status = 'active', last_used = CURRENT_TIMESTAMP WHERE id = ?").run(existing.id);
+            }
             logSecurityEvent("BLUETOOTH_DEVICE_REACTIVATED", req.user.email, req.ip, {
                 deviceId: existing.id,
                 deviceName: cleanDevName
@@ -802,14 +699,15 @@ app.post("/api/bluetooth/pair", authenticateToken, (req, res) => {
         }
 
         const info = db.prepare(`
-            INSERT INTO bluetooth_devices (user_id, device_name, device_identifier, status, last_used)
-            VALUES (?, ?, ?, 'active', CURRENT_TIMESTAMP)
-        `).run(req.user.id, cleanDevName, cleanDevId);
+            INSERT INTO bluetooth_devices (user_id, device_name, device_identifier, status, public_key, algorithm, last_used)
+            VALUES (?, ?, ?, 'active', ?, ?, CURRENT_TIMESTAMP)
+        `).run(req.user.id, cleanDevName, cleanDevId, cleanPubKey, cleanAlgo);
 
         logSecurityEvent("BLUETOOTH_DEVICE_PAIRED", req.user.email, req.ip, {
             deviceId: info.lastInsertRowid,
             deviceName: cleanDevName,
-            deviceIdentifier: cleanDevId.substring(0, 16) + "..."
+            deviceIdentifier: cleanDevId.substring(0, 16) + "...",
+            hasPublicKey: !!cleanPubKey
         }, "INFO", 10, "LOW");
 
         res.json({
@@ -913,7 +811,10 @@ app.post("/api/auth/fallback/verify", (req, res) => {
             { expiresIn: "4h" }
         );
 
-        res.cookie("cybernova_session", token, getCookieOptions(req));
+        res.cookie("cybernova_session", token, {
+            httpOnly: true,
+            sameSite: "lax"
+        });
 
         logSecurityEvent("EMERGENCY_FALLBACK_AUTH", email, req.ip, {
             role: user.role,
@@ -1115,7 +1016,10 @@ app.post("/api/recovery/verify", rateLimiter(5, 60000), (req, res) => {
             { expiresIn: "1h" }
         );
 
-        res.cookie("cybernova_session", token, getCookieOptions(req));
+        res.cookie("cybernova_session", token, {
+            httpOnly: true,
+            sameSite: "lax"
+        });
 
         logSecurityEvent("ACCOUNT_RECOVERY_SUCCESS", email, req.ip, {
             codeId: matchedRow.id,
@@ -1172,7 +1076,7 @@ app.get("/api/me", authenticateToken, (req, res) => {
 });
 
 app.post("/api/logout", (req, res) => {
-    res.clearCookie("cybernova_session", getCookieOptions(req));
+    res.clearCookie("cybernova_session");
     res.json({ success: true, message: "Logged out successfully." });
 });
 
@@ -1223,21 +1127,6 @@ app.get("/api/admin/export-system-keys", (req, res) => {
     res.status(403).json({
         error: "ACCESS_DENIED: Intrusion attempt logged to SOC and IP quarantined.",
         status: "BLOCKED"
-    });
-});
-
-// Global API 404 handler (ensures API always returns valid JSON, never HTML)
-app.use("/api", (req, res) => {
-    res.status(404).json({
-        error: `Endpoint not found: ${req.method} ${req.originalUrl}`
-    });
-});
-
-// Global error handling middleware (ensures all server errors return valid JSON)
-app.use((err, req, res, next) => {
-    console.error("Unhandled Server Error:", err);
-    res.status(err.status || 500).json({
-        error: err.message || "Internal server error occurred."
     });
 });
 

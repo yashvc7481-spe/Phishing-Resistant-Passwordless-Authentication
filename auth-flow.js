@@ -69,19 +69,6 @@ export class CyberNovaAuth {
         // Mode switch links
         this.linkSwitchBluetooth = document.getElementById("switchBluetoothLink");
         this.linkSwitchBiometric = document.getElementById("switchBiometricLink");
-
-        // Bluetooth QR Proximity (FIDO2 Hybrid caBLE)
-        this.qrImage = document.getElementById("btQrImage");
-        this.qrSpinner = document.getElementById("qrCodeSpinner");
-        this.qrStatusText = document.getElementById("qrStatusText");
-        this.qrPulseIndicator = document.getElementById("qrPulseIndicator");
-        this.btnInstantApprove = document.getElementById("btnInstantApprove");
-        this.btnOpenMobileTab = document.getElementById("btnOpenMobileTab");
-        this.btnToggleBleRawScan = document.getElementById("btnToggleBleRawScan");
-        this.btRawScannerSection = document.getElementById("btRawScannerSection");
-        this.qrSessionId = null;
-        this.qrMobileUrl = null;
-        this.qrPollTimer = null;
     }
 
     async detectCapabilities() {
@@ -99,9 +86,21 @@ export class CyberNovaAuth {
         }
 
         // 3. Web Bluetooth API
-        this.capabilities.webBluetooth = typeof navigator !== "undefined" &&
+        this.capabilities.isSecureContext = (typeof window !== "undefined" && window.isSecureContext === true);
+        this.capabilities.hasWebBluetooth = typeof navigator !== "undefined" &&
             !!navigator.bluetooth &&
             typeof navigator.bluetooth.requestDevice === "function";
+
+        this.capabilities.bluetoothAdapterAvailable = null;
+        if (this.capabilities.hasWebBluetooth && navigator.bluetooth.getAvailability) {
+            try {
+                this.capabilities.bluetoothAdapterAvailable = await navigator.bluetooth.getAvailability();
+            } catch (e) {
+                this.capabilities.bluetoothAdapterAvailable = true;
+            }
+        }
+
+        this.capabilities.webBluetooth = this.capabilities.hasWebBluetooth && this.capabilities.bluetoothAdapterAvailable !== false;
     }
 
     renderCapabilityBadges() {
@@ -115,16 +114,26 @@ export class CyberNovaAuth {
 
         const btClass = this.capabilities.webBluetooth ? "supported" : "unsupported";
         const btIcon = this.capabilities.webBluetooth ? "fa-bluetooth-b" : "fa-ban";
-        const btText = this.capabilities.webBluetooth
-            ? "Web Bluetooth API: Supported"
-            : "Web Bluetooth: Unsupported in this browser";
+        let btText = "Web Bluetooth: Unsupported in this browser";
+        let btTitle = "Browser does not expose navigator.bluetooth";
+
+        if (this.capabilities.webBluetooth) {
+            btText = "Web Bluetooth API: Supported";
+            btTitle = "Chromium Web Bluetooth GATT API supported";
+        } else if (!this.capabilities.isSecureContext) {
+            btText = "Bluetooth: HTTPS Required";
+            btTitle = "Web Bluetooth API requires a secure context (HTTPS or localhost)";
+        } else if (this.capabilities.bluetoothAdapterAvailable === false) {
+            btText = "Bluetooth Radio: Turned Off";
+            btTitle = "Bluetooth radio adapter is disabled in your operating system";
+        }
 
         this.capabilityBar.innerHTML = `
             <div class="capability-pill ${bioClass}" title="${this.capabilities.platformBiometrics ? 'Platform authenticator available (Touch ID, Windows Hello, Fingerprint)' : 'No platform biometric sensor detected'}">
                 <i class="fa-solid ${bioIcon}"></i>
                 <span>${bioText}</span>
             </div>
-            <div class="capability-pill ${btClass}" title="${this.capabilities.webBluetooth ? 'Chromium Web Bluetooth GATT API supported' : 'Browser does not expose navigator.bluetooth'}">
+            <div class="capability-pill ${btClass}" title="${btTitle}">
                 <i class="fa-brands ${btIcon}"></i>
                 <span>${btText}</span>
             </div>
@@ -160,18 +169,12 @@ export class CyberNovaAuth {
         [this.tabBiometric, this.tabBluetooth, this.tabFallback].forEach(t => t?.classList.remove("active"));
         [this.panelBiometric, this.panelBluetooth, this.panelFallback].forEach(p => p?.classList.add("hidden"));
 
-        if (this.qrPollTimer) {
-            clearInterval(this.qrPollTimer);
-            this.qrPollTimer = null;
-        }
-
         if (mode === "biometric") {
             this.tabBiometric?.classList.add("active");
             this.panelBiometric?.classList.remove("hidden");
         } else if (mode === "bluetooth") {
             this.tabBluetooth?.classList.add("active");
             this.panelBluetooth?.classList.remove("hidden");
-            this.loadHybridQrCode();
         } else if (mode === "fallback") {
             this.tabFallback?.classList.add("active");
             this.panelFallback?.classList.remove("hidden");
@@ -193,18 +196,6 @@ export class CyberNovaAuth {
 
     getEmail() {
         return (this.emailInput?.value || "").trim().toLowerCase();
-    }
-
-    async parseJson(res) {
-        const text = await res.text();
-        try {
-            return JSON.parse(text);
-        } catch {
-            if (!res.ok) {
-                throw new Error(`Backend service is offline or unreachable (HTTP ${res.status}). Please ensure the Render backend is deployed and running.`);
-            }
-            throw new Error(text.length > 120 ? "Invalid server response." : text);
-        }
     }
 
     setupEventListeners() {
@@ -269,38 +260,6 @@ export class CyberNovaAuth {
             e.preventDefault();
             this.handleFetchDemoCode();
         });
-
-        // 8. QR Proximity Handlers (FIDO2 caBLE)
-        this.btnInstantApprove?.addEventListener("click", (e) => {
-            e.preventDefault();
-            this.handleInstantApprove();
-        });
-
-        this.btnOpenMobileTab?.addEventListener("click", (e) => {
-            e.preventDefault();
-            if (this.qrMobileUrl) {
-                window.open(this.qrMobileUrl, "_blank", "width=420,height=750");
-            } else {
-                this.showStatus("ℹ️ Initializing QR code session first...", "info");
-                this.loadHybridQrCode().then(() => {
-                    if (this.qrMobileUrl) window.open(this.qrMobileUrl, "_blank", "width=420,height=750");
-                });
-            }
-        });
-
-        this.btnToggleBleRawScan?.addEventListener("click", (e) => {
-            e.preventDefault();
-            if (this.btRawScannerSection) {
-                this.btRawScannerSection.classList.toggle("hidden");
-            }
-        });
-
-        // Auto-refresh QR code when email changes while on Bluetooth tab
-        this.emailInput?.addEventListener("change", () => {
-            if (this.panelBluetooth && !this.panelBluetooth.classList.contains("hidden")) {
-                this.loadHybridQrCode();
-            }
-        });
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -325,7 +284,7 @@ export class CyberNovaAuth {
                 body: JSON.stringify({ email })
             });
 
-            const options = await this.parseJson(res);
+            const options = await res.json();
             if (!res.ok) {
                 if (options.error && options.error.includes("No passkeys registered")) {
                     this.showStatus(`⚠️ <strong>No passkey enrolled for this account yet.</strong><br>Click <em>"Enroll Fingerprint on This Device"</em> below to enroll your biometric token.`, "warning");
@@ -348,7 +307,7 @@ export class CyberNovaAuth {
                 body: JSON.stringify({ email, response: credential })
             });
 
-            const result = await this.parseJson(verifyRes);
+            const result = await verifyRes.json();
             if (!verifyRes.ok) throw new Error(result.error || "Biometric authentication rejected by server.");
 
             this.showStatus("✅ <strong>Fingerprint Authenticated!</strong> Secure cryptographic session established. Redirecting...", "success");
@@ -390,7 +349,7 @@ export class CyberNovaAuth {
                 })
             });
 
-            const options = await this.parseJson(res);
+            const options = await res.json();
             if (!res.ok) throw new Error(options.error || "Could not generate enrollment challenge.");
 
             this.showStatus("<i class='fa-solid fa-fingerprint'></i> Place finger on sensor to register biometric passkey...", "info");
@@ -410,7 +369,7 @@ export class CyberNovaAuth {
                 body: JSON.stringify({ email, response: credential, deviceName })
             });
 
-            const result = await this.parseJson(verifyRes);
+            const result = await verifyRes.json();
             if (!verifyRes.ok) throw new Error(result.error || "Biometric enrollment rejected.");
 
             this.showStatus("✅ <strong>Biometric Enrolled Successfully!</strong> Your fingerprint is cryptographically registered. Click <strong>'Sign In with Fingerprint'</strong> to enter.", "success");
@@ -424,139 +383,130 @@ export class CyberNovaAuth {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // BLUETOOTH PROXIMITY AUTHENTICATION (FIDO2 caBLE / HYBRID QR)
+    // BLUETOOTH PROXIMITY AUTHENTICATION (WEB BLUETOOTH API)
     // ─────────────────────────────────────────────────────────────
 
-    async loadHybridQrCode() {
-        if (!this.qrImage) return;
-
-        const email = this.getEmail();
-        if (this.qrSpinner) this.qrSpinner.classList.remove("hidden");
-        this.qrImage.classList.add("hidden");
-        if (this.qrStatusText) this.qrStatusText.textContent = "Generating Cryptographic Nonce QR...";
-        if (this.qrPulseIndicator) this.qrPulseIndicator.className = "bt-pulse-indicator idle";
-
+    // Helper: Safe JSON response parser
+    async safeParseJson(res) {
+        const text = await res.text();
         try {
-            const res = await fetch("/api/auth/hybrid-qr/generate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: email || "" })
-            });
-            const data = await this.parseJson(res);
-            const qrUrl = data.qrCodeDataUrl || data.qrDataUrl;
-            const mobileUrl = data.mobileAuthUrl || data.mobileUrl;
-            if (data.success && qrUrl) {
-                this.qrSessionId = data.sessionId;
-                this.qrMobileUrl = mobileUrl;
-                this.qrImage.src = qrUrl;
-                if (this.qrSpinner) this.qrSpinner.classList.add("hidden");
-                this.qrImage.classList.remove("hidden");
-                if (this.qrStatusText) this.qrStatusText.textContent = "Awaiting Phone Camera Scan...";
-                if (this.qrPulseIndicator) this.qrPulseIndicator.className = "bt-pulse-indicator connected";
-
-                // Start polling session status
-                this.startQrPolling(data.sessionId);
-            } else {
-                if (this.qrSpinner) this.qrSpinner.classList.add("hidden");
-                if (this.qrStatusText) this.qrStatusText.textContent = "Unable to generate QR code. Check backend.";
+            return JSON.parse(text);
+        } catch {
+            if (!res.ok) {
+                throw new Error(`Server returned HTTP ${res.status}: ${text.slice(0, 100)}`);
             }
-        } catch (err) {
-            console.error("Hybrid QR generation error:", err);
-            if (this.qrSpinner) this.qrSpinner.classList.add("hidden");
-            if (this.qrStatusText) this.qrStatusText.textContent = "Network error generating QR code.";
+            throw new Error(text.slice(0, 100) || "Invalid server response.");
         }
     }
 
-    startQrPolling(sessionId) {
-        if (this.qrPollTimer) clearInterval(this.qrPollTimer);
-        this.qrPollTimer = setInterval(async () => {
-            try {
-                const res = await fetch(`/api/auth/hybrid-qr/status?sessionId=${encodeURIComponent(sessionId)}`);
-                const data = await this.parseJson(res);
-                if (data.success && data.status === "approved") {
-                    clearInterval(this.qrPollTimer);
-                    this.qrPollTimer = null;
-                    if (this.qrStatusText) this.qrStatusText.textContent = "✅ Proximity Biometrics Approved!";
-                    if (this.qrPulseIndicator) this.qrPulseIndicator.className = "bt-pulse-indicator connected";
-                    this.showStatus(
-                        `✅ <strong>Bluetooth Proximity Approved:</strong> Mobile authenticator (<em>${data.deviceName || "Paired Mobile Device"}</em>) verified your biometrics. Redirecting...`,
-                        "success"
-                    );
-                    setTimeout(() => {
-                        window.location.href = data.redirect || "/student-dashboard.html";
-                    }, 800);
-                } else if (data.status === "expired") {
-                    clearInterval(this.qrPollTimer);
-                    this.qrPollTimer = null;
-                    if (this.qrStatusText) this.qrStatusText.textContent = "QR code expired. Switch tab to refresh.";
+    // Helper: Open IndexedDB for local hardware key storage
+    async openBleKeyDb() {
+        return new Promise((resolve) => {
+            if (typeof indexedDB === "undefined") return resolve(null);
+            const req = indexedDB.open("CyberNovaBleKeyStore", 1);
+            req.onupgradeneeded = () => {
+                if (!req.result.objectStoreNames.contains("device_keys")) {
+                    req.result.createObjectStore("device_keys", { keyPath: "id" });
                 }
-            } catch (pollErr) {
-                console.warn("QR status poll warning:", pollErr);
-            }
-        }, 1500);
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(null);
+        });
     }
 
-    async handleInstantApprove() {
-        if (!this.qrSessionId) {
-            await this.loadHybridQrCode();
-        }
-        if (!this.qrSessionId) {
-            this.showStatus("⚠️ Please wait for QR session generation.", "error");
-            return;
-        }
-
-        if (this.btnInstantApprove) this.btnInstantApprove.disabled = true;
-        if (this.qrStatusText) this.qrStatusText.textContent = "Verifying Mobile Biometric Proof...";
-
+    // Helper: Retrieve registered CryptoKey from IndexedDB
+    async getStoredBleKey(deviceId) {
         try {
-            const res = await fetch("/api/auth/hybrid-qr/approve", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    sessionId: this.qrSessionId,
-                    deviceName: "Paired Mobile Device (Camera Scan & Proximity)"
-                })
+            const db = await this.openBleKeyDb();
+            if (!db) return null;
+            return new Promise((resolve) => {
+                const tx = db.transaction("device_keys", "readonly");
+                const req = tx.objectStore("device_keys").get(deviceId);
+                req.onsuccess = () => resolve(req.result ? req.result.privateKey : null);
+                req.onerror = () => resolve(null);
             });
-            const data = await this.parseJson(res);
-            if (data.success) {
-                if (this.qrStatusText) this.qrStatusText.textContent = "✅ Instant Approval Confirmed!";
-                this.showStatus(
-                    "✅ <strong>Instant Biometric Proximity Approved:</strong> Verified via smartphone passkey authenticator. Redirecting to your dashboard...",
-                    "success"
-                );
-                setTimeout(() => {
-                    window.location.href = data.redirect || "/student-dashboard.html";
-                }, 700);
-            } else {
-                this.showStatus("❌ Approval failed: " + (data.error || "Unknown error"), "error");
-                if (this.btnInstantApprove) this.btnInstantApprove.disabled = false;
-            }
-        } catch (err) {
-            this.showStatus("❌ Network error approving session: " + err.message, "error");
-            if (this.btnInstantApprove) this.btnInstantApprove.disabled = false;
+        } catch {
+            return null;
         }
     }
 
-    setScannerState(state, message) {
+    // Set Bluetooth scanner status across all 9 required states
+    setScannerState(status, message = "") {
+        let pulseClass = "idle";
+        let radarScanning = false;
+        let radarTitle = "Web Bluetooth Proximity Authenticator";
+        let radarSubtitle = "BLE GATT Proximity · Cryptographic Challenge";
+
+        switch (status) {
+            case "Bluetooth Not Available":
+                pulseClass = "unsupported";
+                radarTitle = "Bluetooth Not Available";
+                radarSubtitle = message || "Web Bluetooth is unsupported in this browser or adapter is disabled";
+                break;
+            case "Bluetooth Available":
+                pulseClass = "idle";
+                radarTitle = "Bluetooth Available";
+                radarSubtitle = message || "Scanner Ready · Discoverable BLE Mode";
+                break;
+            case "Scanning for Devices":
+                pulseClass = "scanning";
+                radarScanning = true;
+                radarTitle = "Scanning for Devices";
+                radarSubtitle = message || "Discovering nearby BLE authenticators (2.4 GHz)";
+                break;
+            case "Device Found":
+                pulseClass = "connected";
+                radarTitle = "Device Found";
+                radarSubtitle = message || "BLE device selected · Preparing connection";
+                break;
+            case "Connecting":
+                pulseClass = "scanning";
+                radarScanning = true;
+                radarTitle = "Connecting";
+                radarSubtitle = message || "Establishing GATT channel & discovering services";
+                break;
+            case "Authenticating":
+                pulseClass = "scanning";
+                radarScanning = true;
+                radarTitle = "Authenticating";
+                radarSubtitle = message || "Verifying ephemeral cryptographic challenge with server";
+                break;
+            case "Authentication Successful":
+                pulseClass = "connected";
+                radarTitle = "Authentication Successful";
+                radarSubtitle = message || "Cryptographic proof confirmed · Access Granted";
+                break;
+            case "Authentication Failed":
+                pulseClass = "unsupported";
+                radarTitle = "Authentication Failed";
+                radarSubtitle = message || "Cryptographic verification rejected or device not authorized";
+                break;
+            case "Device Disconnected":
+                pulseClass = "idle";
+                radarTitle = "Device Disconnected";
+                radarSubtitle = message || "GATT connection terminated safely";
+                break;
+            default:
+                pulseClass = status === "scanning" ? "scanning" : (status === "connected" ? "connected" : "idle");
+                radarScanning = status === "scanning";
+                if (message) radarSubtitle = message;
+        }
+
         if (this.btPulseIndicator) {
-            this.btPulseIndicator.className = `bt-pulse-indicator ${state}`;
+            this.btPulseIndicator.className = `bt-pulse-indicator ${pulseClass}`;
         }
         if (this.btStatusLabel) {
-            this.btStatusLabel.innerHTML = message;
+            this.btStatusLabel.innerHTML = `<strong>${status}</strong>${message ? ` · ${message}` : ""}`;
         }
-        if (state === "scanning") {
-            this.btRadarBox?.classList.add("is-scanning");
-            if (this.btRadarTitle) this.btRadarTitle.textContent = "Scanning Nearby BLE Channels...";
-            if (this.btRadarSubtitle) this.btRadarSubtitle.textContent = "Discovering 2.4 GHz Advertising Peripherals";
-        } else if (state === "connected") {
-            this.btRadarBox?.classList.remove("is-scanning");
-            if (this.btRadarTitle) this.btRadarTitle.textContent = "Bluetooth Proximity Channel Active";
-            if (this.btRadarSubtitle) this.btRadarSubtitle.textContent = "Hardware Link Verified · Nonce Generated";
-        } else {
-            this.btRadarBox?.classList.remove("is-scanning");
-            if (this.btRadarTitle) this.btRadarTitle.textContent = "Web Bluetooth Proximity Authenticator";
-            if (this.btRadarSubtitle) this.btRadarSubtitle.textContent = "BLE GATT Proximity · Cryptographic Challenge";
+        if (this.btRadarBox) {
+            if (radarScanning) {
+                this.btRadarBox.classList.add("is-scanning");
+            } else {
+                this.btRadarBox.classList.remove("is-scanning");
+            }
         }
+        if (this.btRadarTitle) this.btRadarTitle.textContent = radarTitle;
+        if (this.btRadarSubtitle) this.btRadarSubtitle.textContent = radarSubtitle;
     }
 
     async handleBluetoothConnect({ isDemo = false } = {}) {
@@ -571,62 +521,142 @@ export class CyberNovaAuth {
             if (this.btnBluetoothDemo) this.btnBluetoothDemo.disabled = true;
 
             let device = null;
+            let signingKey = null;
 
             if (isDemo) {
-                // Synthetic / Virtual BLE Hardware Token for automated or browser testing
-                this.setScannerState("scanning", "Emulating 2.4GHz BLE Peripheral Discovery...");
-                this.showStatus("<i class='fa-solid fa-spinner fa-spin'></i> Pairing virtual <strong>Titan Security BLE Token</strong>...", "info");
-                await new Promise(r => setTimeout(r, 600));
+                // Synthetic / Virtual BLE Hardware Token with genuine cryptographic keypair
+                this.setScannerState("Scanning for Devices", "Discovering simulated hardware token");
+                this.showStatus("<i class='fa-solid fa-spinner fa-spin'></i> Scanning 2.4 GHz channels for virtual <strong>Titan Security BLE Token</strong>...", "info");
+                await new Promise(r => setTimeout(r, 450));
+
+                const isStaff = email.includes("staff");
+                const demoConfig = isStaff
+                    ? {
+                        id: "BLE-YUBI-STF-4412",
+                        name: "YubiKey 5C NFC/BLE Proximity Token",
+                        pkcs8: "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgxk5oPgBvQjJGLFA4jfxdddE/8xM6/xVcMyd/GE+XYHehRANCAARPUIWbl9HF8pS068+0tqbBMgIPLOncQUKc66iTJptCmBMQlV2mdhuPI3Gmr3Acxqhik7VfAdKXDv3+v2/ss/ph"
+                    }
+                    : {
+                        id: "BLE-TITAN-STU-8819",
+                        name: "Titan Security BLE Key (Hardware Token)",
+                        pkcs8: "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgj3OZ1lDndLmqlA8r2VWwWnlotLVuG1hkSPpiC1RDSaGhRANCAARAK2yKY0YlX0PFRJZ47OugdA1uMM5h2NG4ymOj2K1BPBZfHVI1TK0Bv9tuy3l0keWQj3BKpsmsYPHF4pTLnx56"
+                    };
 
                 device = {
-                    id: "BLE-TITAN-STU-8819",
-                    name: "Titan Security BLE Key (Demo Hardware Token)"
+                    id: demoConfig.id,
+                    name: demoConfig.name,
+                    isVirtual: true
                 };
+
+                this.setScannerState("Device Found", device.name);
+                await new Promise(r => setTimeout(r, 300));
+
+                this.setScannerState("Connecting", `Establishing GATT link to ${device.name}`);
+                await new Promise(r => setTimeout(r, 300));
+
+                // Import Demo PKCS8 Private Key for genuine cryptographic signing
+                const binaryStr = atob(demoConfig.pkcs8);
+                const bytes = new Uint8Array(binaryStr.length);
+                for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+                signingKey = await window.crypto.subtle.importKey(
+                    "pkcs8",
+                    bytes.buffer,
+                    { name: "ECDSA", namedCurve: "P-256" },
+                    false,
+                    ["sign"]
+                );
+
             } else {
-                // Real Web Bluetooth API check
-                if (!this.capabilities.webBluetooth) {
-                    this.setScannerState("idle", "Web Bluetooth API Unsupported");
+                // Real Web Bluetooth API Flow
+                if (!window.isSecureContext) {
+                    this.setScannerState("Bluetooth Not Available", "HTTPS Required");
+                    this.showStatus("❌ <strong>HTTPS Required:</strong> Web Bluetooth API requires a secure context (HTTPS or localhost).", "error");
+                    return;
+                }
+
+                if (!navigator.bluetooth || typeof navigator.bluetooth.requestDevice !== "function") {
+                    this.setScannerState("Bluetooth Not Available", "Browser Unsupported");
                     this.showStatus(
-                        "⚠️ <strong>Web Bluetooth API Unavailable in this Browser:</strong><br>" +
-                        "Web Bluetooth is supported on Google Chrome, Microsoft Edge, and Opera on Desktop/Android.<br>" +
-                        "👉 Click <strong>'Demo Token'</strong> to test the complete challenge-response ceremony without physical hardware, or use the <strong>Security Key</strong> tab.",
+                        "⚠️ <strong>Web Bluetooth Not Supported:</strong><br>" +
+                        "This browser does not support the Web Bluetooth API. Please use Google Chrome, Microsoft Edge, or Opera on Desktop/Android.<br>" +
+                        "👉 Click <strong>'Demo Token'</strong> to test the complete cryptographic challenge-response ceremony without physical hardware.",
                         "warning"
                     );
                     return;
                 }
 
-                this.setScannerState("scanning", "Scanning 2.4GHz BLE channels for discoverable authenticators...");
-                this.showStatus("<i class='fa-brands fa-bluetooth-b fa-spin'></i> <strong>Bluetooth Scanner Active:</strong> Select your discoverable device in the browser dialog...", "info");
+                if (navigator.bluetooth.getAvailability) {
+                    const isAvailable = await navigator.bluetooth.getAvailability();
+                    if (!isAvailable) {
+                        this.setScannerState("Bluetooth Not Available", "Bluetooth Radio Off");
+                        this.showStatus("⚠️ <strong>Bluetooth Radio Unavailable:</strong> Please enable Bluetooth in your computer or device settings.", "warning");
+                        return;
+                    }
+                }
 
-                // Request device from navigator.bluetooth
+                this.setScannerState("Scanning for Devices", "Select your BLE authenticator in the browser dialog");
+                this.showStatus("<i class='fa-brands fa-bluetooth-b fa-spin'></i> <strong>Scanning for Devices:</strong> Please select your BLE hardware token in the browser device chooser...", "info");
+
+                // Request device with full service list
                 device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: [
                         "generic_access",
                         "device_information",
-                        "battery_service"
+                        "battery_service",
+                        0xfffd,
+                        "0000fffd-0000-1000-8000-00805f9b34fb"
                     ]
                 });
 
-                this.setScannerState("scanning", `Connecting to GATT server on ${device.name || "Bluetooth Peripheral"}...`);
+                this.setScannerState("Device Found", device.name || "Bluetooth Peripheral");
+                this.setScannerState("Connecting", `GATT connecting to ${device.name || "BLE Authenticator"}...`);
 
-                // Attempt GATT server connection
-                try {
-                    const gattServer = await device.gatt.connect();
-                    this.activeBluetoothServer = gattServer;
-                } catch (gattErr) {
-                    console.warn("GATT service warning (proximity link still valid):", gattErr);
+                // Connect to GATT Server
+                let gattServer = null;
+                let discoveredServices = [];
+                let hasCryptoService = false;
+
+                if (device.gatt) {
+                    try {
+                        gattServer = await device.gatt.connect();
+                        this.activeBluetoothServer = gattServer;
+
+                        // Service and characteristic discovery
+                        try {
+                            discoveredServices = await gattServer.getPrimaryServices();
+                            for (const svc of discoveredServices) {
+                                const uuidStr = String(svc.uuid).toLowerCase();
+                                if (uuidStr.includes("fffd") || uuidStr.includes("6e40")) {
+                                    hasCryptoService = true;
+                                }
+                                try {
+                                    await svc.getCharacteristics();
+                                } catch (eChar) {}
+                            }
+                        } catch (eSvc) {
+                            console.warn("GATT service enumeration notice:", eSvc);
+                        }
+                    } catch (gattErr) {
+                        console.warn("GATT connection warning:", gattErr);
+                    }
                 }
 
+                // Register disconnection listener
                 device.addEventListener("gattserverdisconnected", () => {
                     this.onBluetoothDisconnected();
                 });
+
+                // Check for registered cryptographic key in local storage / IndexedDB
+                signingKey = await this.getStoredBleKey(device.id);
+                device.hasCryptoService = hasCryptoService;
             }
 
             this.activeBluetoothDevice = device;
-            this.setScannerState("connected", `Proximity Linked: ${device.name || "BLE Authenticator"}`);
+            this.activeSigningKey = signingKey;
 
-            // Request Cryptographic Challenge from CyberNova Server
+            // Request Ephemeral Single-Use Cryptographic Challenge from CyberNova Server
             this.showStatus("<i class='fa-solid fa-lock'></i> Requesting single-use cryptographic challenge from server...", "info");
 
             const challengeRes = await fetch("/api/auth/bluetooth/challenge", {
@@ -639,27 +669,30 @@ export class CyberNovaAuth {
                 })
             });
 
-            const challengeData = await this.parseJson(challengeRes);
+            const challengeData = await this.safeParseJson(challengeRes);
             if (!challengeRes.ok) throw new Error(challengeData.error || "Failed to generate Bluetooth challenge.");
 
             this.currentBluetoothSession = challengeData;
 
-            // Render connected state
+            // Render connected state and ready for cryptographic challenge signing
             this.renderBluetoothConnectedState(device, challengeData);
+            this.setScannerState("Authenticating", "Challenge Ready · Proximity Active");
             this.showStatus(
-                "🔗 <strong>Bluetooth Proximity Link Established!</strong> Single-use challenge nonce received. Click <strong>'Verify Proximity & Sign In'</strong> to complete authentication.",
+                "🔗 <strong>Bluetooth Device Linked!</strong> Ephemeral challenge nonce received. Click <strong>'Verify Proximity & Sign In'</strong> to cryptographically sign and complete authentication.",
                 "info"
             );
 
         } catch (err) {
             console.error("Bluetooth connection error:", err);
-            this.setScannerState("idle", "Scanner Ready · Discoverable BLE Mode");
             if (err.name === "NotFoundError") {
-                this.showStatus("ℹ️ Bluetooth pairing dismissed or no device selected. You can click <strong>Demo Token</strong> for instant testing.", "info");
+                this.setScannerState("Bluetooth Available", "Device Chooser Dismissed");
+                this.showStatus("ℹ️ Bluetooth device selection was dismissed. You can try scanning again or click <strong>Demo Token</strong>.", "info");
             } else if (err.name === "SecurityError") {
-                this.showStatus("❌ Bluetooth access blocked: Web Bluetooth requires a secure context (HTTPS/localhost) and user gesture.", "error");
+                this.setScannerState("Bluetooth Not Available", "Permission Blocked");
+                this.showStatus("❌ Bluetooth access blocked: Web Bluetooth requires a secure context (HTTPS/localhost) and user permission.", "error");
             } else {
-                this.showStatus(`❌ Bluetooth Connection Error: ${err.message || "Failed to pair with device."}`, "error");
+                this.setScannerState("Authentication Failed", err.message || "Failed to connect to device");
+                this.showStatus(`❌ Bluetooth Connection Error: ${err.message || "Failed to connect with device."}`, "error");
             }
         } finally {
             if (this.btnBluetoothConnect) this.btnBluetoothConnect.disabled = false;
@@ -685,7 +718,7 @@ export class CyberNovaAuth {
             this.btChallengeDisplay.innerHTML = `
                 <div><span style="color: var(--text-muted);">Session ID:</span> ${challengeData.sessionId}</div>
                 <div><span style="color: var(--text-muted);">Ephemeral Nonce:</span> <strong style="color: #60A5FA;">${challengeData.challenge}</strong></div>
-                <div style="margin-top: 4px; color: var(--success);"><i class="fa-solid fa-shield-check"></i> Proximity Cryptographic Proof Ready (Valid for ${challengeData.expiresInSeconds}s)</div>
+                <div style="margin-top: 4px; color: var(--success);"><i class="fa-solid fa-shield-check"></i> Cryptographic Proof Ready (Valid for ${challengeData.expiresInSeconds}s)</div>
             `;
         }
 
@@ -704,7 +737,41 @@ export class CyberNovaAuth {
 
         try {
             if (this.btnBluetoothVerify) this.btnBluetoothVerify.disabled = true;
-            this.showStatus("<i class='fa-solid fa-spinner fa-spin'></i> Submitting cryptographic proximity proof to CyberNova backend...", "info");
+            this.setScannerState("Authenticating", "Signing challenge with device private key...");
+            this.showStatus("<i class='fa-solid fa-spinner fa-spin'></i> Performing cryptographic challenge-response signature...", "info");
+
+            let signingKey = this.activeSigningKey;
+            if (!signingKey && device?.id) {
+                signingKey = await this.getStoredBleKey(device.id);
+            }
+
+            // Strict Anti-Fake Check: Detect hardware limitations transparently
+            if (!signingKey) {
+                const devLabel = device?.name || "Selected BLE Peripheral";
+                const limitationMsg = `Hardware Limitation: Selected BLE device ('${devLabel}') does not support cryptographic challenge-response authentication. Standard BLE peripherals without cryptographic keypairs cannot be used as authentication tokens. Please pair a compatible BLE authenticator from the dashboard.`;
+                this.setScannerState("Authentication Failed", "Device lacks cryptographic signing capability");
+                throw new Error(limitationMsg);
+            }
+
+            // Cryptographically sign the server's single-use challenge nonce with the device's private key
+            const challengeStr = this.currentBluetoothSession.challenge;
+            const dataToSign = new TextEncoder().encode(challengeStr);
+
+            const signatureBuffer = await window.crypto.subtle.sign(
+                { name: "ECDSA", hash: { name: "SHA-256" } },
+                signingKey,
+                dataToSign
+            );
+
+            // Convert IEEE-P1363 signature buffer to Base64
+            const sigBytes = new Uint8Array(signatureBuffer);
+            let binary = "";
+            for (let i = 0; i < sigBytes.byteLength; i++) {
+                binary += String.fromCharCode(sigBytes[i]);
+            }
+            const signatureBase64 = btoa(binary);
+
+            this.showStatus("<i class='fa-solid fa-shield-halved fa-spin'></i> Submitting cryptographic signature proof to CyberNova backend...", "info");
 
             const res = await fetch("/api/auth/bluetooth/verify", {
                 method: "POST",
@@ -714,26 +781,27 @@ export class CyberNovaAuth {
                     email,
                     deviceName: device?.name || "Bluetooth Verified Authenticator",
                     deviceId: device?.id || "BLE-" + Date.now(),
-                    challengeProof: "HMAC_GATT_PROXIMITY_VALIDATED"
+                    signature: signatureBase64,
+                    challengeProof: signatureBase64
                 })
             });
 
-            const result = await this.parseJson(res);
+            const result = await this.safeParseJson(res);
             if (!res.ok) {
-                if (res.status === 403) {
-                    throw new Error(result.error || "Access Denied: This Bluetooth device has been revoked or failed security checks.");
-                }
+                this.setScannerState("Authentication Failed", result.error || "Verification rejected");
                 throw new Error(result.error || "Bluetooth challenge verification failed.");
             }
 
-            this.showStatus("✅ <strong>Bluetooth Proximity Authenticated!</strong> Ephemeral nonce verified against server. Redirecting...", "success");
+            this.setScannerState("Authentication Successful", "Identity Verified");
+            this.showStatus("✅ <strong>Bluetooth Authentication Successful!</strong> Ephemeral challenge signature verified by server. Redirecting...", "success");
 
             setTimeout(() => {
-                window.location.href = result.redirect;
-            }, 800);
+                window.location.href = result.redirect || "/student-dashboard.html";
+            }, 750);
 
         } catch (err) {
             console.error("Bluetooth verify error:", err);
+            this.setScannerState("Authentication Failed", err.message || "Verification failed");
             this.showStatus(`❌ ${err.message || "Bluetooth verification failed."}`, "error");
         } finally {
             if (this.btnBluetoothVerify) this.btnBluetoothVerify.disabled = false;
@@ -747,14 +815,16 @@ export class CyberNovaAuth {
             } catch (e) {}
         }
         this.onBluetoothDisconnected();
-        this.showStatus("ℹ️ Bluetooth device disconnected. Proximity session cleared.", "info");
+        this.setScannerState("Device Disconnected", "Proximity link terminated");
+        this.showStatus("ℹ️ Bluetooth device disconnected. Proximity session cleared safely.", "info");
     }
 
     onBluetoothDisconnected() {
         this.activeBluetoothDevice = null;
         this.activeBluetoothServer = null;
+        this.activeSigningKey = null;
         this.currentBluetoothSession = null;
-        this.setScannerState("idle", "Scanner Ready · Discoverable BLE Mode");
+        this.setScannerState("Device Disconnected", "Scanner Ready");
         this.btConnectedCard?.classList.add("hidden");
         this.btActionButtonsRow?.classList.remove("hidden");
     }
@@ -787,7 +857,7 @@ export class CyberNovaAuth {
                 body: JSON.stringify({ email, code })
             });
 
-            const result = await this.parseJson(res);
+            const result = await res.json();
             if (!res.ok) throw new Error(result.error || "Emergency code verification failed.");
 
             this.showStatus("✅ <strong>High Assurance Verification Confirmed!</strong> Redirecting to secure portal...", "success");
@@ -813,7 +883,7 @@ export class CyberNovaAuth {
 
         try {
             const res = await fetch(`/api/auth/fallback/hint?email=${encodeURIComponent(email)}`);
-            const data = await this.parseJson(res);
+            const data = await res.json();
             if (data.code && this.fallbackCodeInput) {
                 this.fallbackCodeInput.value = data.code;
                 this.showStatus(`ℹ️ Loaded enrolled emergency backup code: <code>${data.code}</code>. Click <strong>Verify Emergency Code</strong> to sign in.`, "info");

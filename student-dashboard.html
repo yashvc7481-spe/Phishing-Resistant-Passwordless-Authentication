@@ -336,18 +336,6 @@
 
     let currentUserEmail = "";
 
-    async function safeJson(res) {
-        const text = await res.text();
-        try {
-            return JSON.parse(text);
-        } catch {
-            if (!res.ok) {
-                throw new Error(`Backend service is offline or unreachable (HTTP ${res.status}). Ensure the Render backend is running.`);
-            }
-            throw new Error(text.length > 120 ? "Invalid server response." : text);
-        }
-    }
-
     async function loadDashboard() {
         try {
             const res = await fetch("/api/me");
@@ -355,7 +343,7 @@
                 window.location.href = "student-login.html";
                 return;
             }
-            const data = await safeJson(res);
+            const data = await res.json();
             currentUserEmail = data.user.email;
 
             const name = data.user.displayName || data.user.email;
@@ -459,7 +447,7 @@
         const tbody = document.getElementById("userActivityBody");
         try {
             const res = await fetch("/api/user/audit-logs");
-            const data = await safeJson(res);
+            const data = await res.json();
             if (!data.logs || data.logs.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">No security events recorded for this account yet.</td></tr>`;
                 return;
@@ -500,7 +488,7 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ deviceName: newName.trim() })
             });
-            const data = await safeJson(res);
+            const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to rename.");
             loadDashboard();
         } catch (err) {
@@ -513,7 +501,7 @@
 
         try {
             const res = await fetch(`/api/credentials/${credId}/revoke`, { method: "POST" });
-            const data = await safeJson(res);
+            const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to revoke passkey.");
             loadDashboard();
         } catch (err) {
@@ -530,7 +518,7 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: currentUserEmail })
             });
-            const options = await safeJson(res);
+            const options = await res.json();
             if (!res.ok) throw new Error(options.error || "Failed to initialize registration.");
 
             const credential = await startRegistration({ optionsJSON: options });
@@ -541,7 +529,7 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: currentUserEmail, response: credential, deviceName })
             });
-            const result = await safeJson(verifyRes);
+            const result = await verifyRes.json();
             if (!verifyRes.ok) throw new Error(result.error || "Registration failed.");
 
             alert("✅ New passkey device enrolled successfully!");
@@ -561,7 +549,7 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ deviceName: newName.trim() })
             });
-            const data = await safeJson(res);
+            const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to rename.");
             loadDashboard();
         } catch (err) {
@@ -574,7 +562,7 @@
 
         try {
             const res = await fetch(`/api/bluetooth/devices/${devId}/revoke`, { method: "POST" });
-            const data = await safeJson(res);
+            const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to revoke Bluetooth device.");
             loadDashboard();
         } catch (err) {
@@ -598,33 +586,88 @@
         btPairingScannerBox?.classList.add("hidden");
     });
 
+    // IndexedDB helper for Bluetooth authenticator private keys
+    async function storeLocalBleKey(deviceId, privateKey) {
+        if (typeof indexedDB === "undefined") return;
+        return new Promise((resolve) => {
+            const req = indexedDB.open("CyberNovaBleKeyStore", 1);
+            req.onupgradeneeded = () => {
+                if (!req.result.objectStoreNames.contains("device_keys")) {
+                    req.result.createObjectStore("device_keys", { keyPath: "id" });
+                }
+            };
+            req.onsuccess = () => {
+                const db = req.result;
+                const tx = db.transaction("device_keys", "readwrite");
+                tx.objectStore("device_keys").put({ id: deviceId, privateKey, savedAt: Date.now() });
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+            };
+            req.onerror = () => resolve();
+        });
+    }
+
     btnStartBleScan?.addEventListener("click", async () => {
-        if (!navigator.bluetooth) {
+        if (!window.isSecureContext) {
+            alert("🔒 HTTPS Required: Web Bluetooth API requires a secure context (HTTPS or localhost).");
+            return;
+        }
+
+        if (!navigator.bluetooth || typeof navigator.bluetooth.requestDevice !== "function") {
             alert("Web Bluetooth API is not supported in this browser (Google Chrome, Microsoft Edge, or Opera required). You can click 'Pair Demo BLE Token' instead.");
             return;
         }
 
         try {
-            if (btPairScannerStatus) btPairScannerStatus.innerHTML = "<i class='fa-brands fa-bluetooth-b fa-spin' style='color:#38BDF8;'></i> Scanning for discoverable Bluetooth devices...";
+            if (btPairScannerStatus) btPairScannerStatus.innerHTML = "<i class='fa-brands fa-bluetooth-b fa-spin' style='color:#38BDF8;'></i> <strong>Scanning for Devices:</strong> Select your BLE hardware token...";
             const device = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
-                optionalServices: ["generic_access", "device_information", "battery_service"]
+                optionalServices: [
+                    "generic_access",
+                    "device_information",
+                    "battery_service",
+                    0xfffd,
+                    "0000fffd-0000-1000-8000-00805f9b34fb"
+                ]
             });
 
-            if (btPairScannerStatus) btPairScannerStatus.innerHTML = `<i class='fa-solid fa-spinner fa-spin'></i> Enrolling <strong>${device.name || "BLE Authenticator"}</strong> to account...`;
+            if (btPairScannerStatus) btPairScannerStatus.innerHTML = `<i class='fa-solid fa-spinner fa-spin' style='color:#38BDF8;'></i> Generating secure cryptographic keypair for <strong>${device.name || "BLE Authenticator"}</strong>...`;
+
+            // Generate ECDSA P-256 keypair for this physical BLE device
+            const keyPair = await window.crypto.subtle.generateKey(
+                { name: "ECDSA", namedCurve: "P-256" },
+                false,
+                ["sign"]
+            );
+
+            // Store private key securely in client IndexedDB (never sent to server)
+            await storeLocalBleKey(device.id, keyPair.privateKey);
+
+            // Export SPKI Public Key for server enrollment
+            const spkiBuffer = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
+            const spkiBytes = new Uint8Array(spkiBuffer);
+            let binary = "";
+            for (let i = 0; i < spkiBytes.byteLength; i++) binary += String.fromCharCode(spkiBytes[i]);
+            const spkiBase64 = btoa(binary);
+            const publicKeyPem = `-----BEGIN PUBLIC KEY-----\n${spkiBase64.match(/.{1,64}/g).join("\n")}\n-----END PUBLIC KEY-----`;
+
+            if (btPairScannerStatus) btPairScannerStatus.innerHTML = `<i class='fa-solid fa-spinner fa-spin'></i> Enrolling public key with CyberNova backend...`;
 
             const res = await fetch("/api/bluetooth/pair", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     deviceName: device.name || "Bluetooth Authenticator",
-                    deviceIdentifier: device.id
+                    deviceIdentifier: device.id,
+                    publicKey: publicKeyPem,
+                    algorithm: "ES256"
                 })
             });
 
-            const data = await safeJson(res);
+            const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to pair device.");
 
+            if (btPairScannerStatus) btPairScannerStatus.innerHTML = `<i class='fa-solid fa-circle-check' style='color:#22c55e;'></i> <strong>Pairing Successful:</strong> ${device.name || "BLE Device"} registered with cryptographic credentials.`;
             alert("✅ " + data.message);
             btPairingScannerBox?.classList.add("hidden");
             loadDashboard();
@@ -640,15 +683,37 @@
     btnPairDemoBle?.addEventListener("click", async () => {
         try {
             const devName = prompt("Enter a label for this demo Bluetooth hardware token:", "YubiKey 5C BLE Token") || "Demo BLE Authenticator";
+            const devId = "BLE-VIRTUAL-" + Math.floor(1000 + Math.random() * 9000);
+
+            if (btPairScannerStatus) btPairScannerStatus.innerHTML = "<i class='fa-solid fa-spinner fa-spin'></i> Generating cryptographic token keypair...";
+
+            // Generate genuine ECDSA P-256 keypair
+            const keyPair = await window.crypto.subtle.generateKey(
+                { name: "ECDSA", namedCurve: "P-256" },
+                false,
+                ["sign"]
+            );
+
+            await storeLocalBleKey(devId, keyPair.privateKey);
+
+            const spkiBuffer = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
+            const spkiBytes = new Uint8Array(spkiBuffer);
+            let binary = "";
+            for (let i = 0; i < spkiBytes.byteLength; i++) binary += String.fromCharCode(spkiBytes[i]);
+            const spkiBase64 = btoa(binary);
+            const publicKeyPem = `-----BEGIN PUBLIC KEY-----\n${spkiBase64.match(/.{1,64}/g).join("\n")}\n-----END PUBLIC KEY-----`;
+
             const res = await fetch("/api/bluetooth/pair", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     deviceName: devName,
-                    deviceIdentifier: "BLE-VIRTUAL-" + Math.floor(1000 + Math.random() * 9000)
+                    deviceIdentifier: devId,
+                    publicKey: publicKeyPem,
+                    algorithm: "ES256"
                 })
             });
-            const data = await safeJson(res);
+            const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to pair demo device.");
 
             alert("✅ " + data.message);
@@ -664,7 +729,7 @@
         if (!confirm("Generating new recovery codes will invalidate any existing recovery codes. Continue?")) return;
         try {
             const res = await fetch("/api/recovery/generate", { method: "POST" });
-            const data = await safeJson(res);
+            const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to generate codes.");
 
             const box = document.getElementById("newRecoveryCodesBox");
